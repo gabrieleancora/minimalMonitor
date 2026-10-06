@@ -10,12 +10,12 @@ Updated: 2026-10-06. "Proposed" is a planning baseline, not owner approval or a 
 | D-02 | Confirmed | Work within 256 MiB available RAM and 2 GiB available space. |
 | D-03 | Confirmed | Day/night appearance; Uptime Kuma is the GUI reference. |
 | D-04 | Confirmed | Planning agent writes specifications only; owner explicitly calls other agents. |
-| D-05 | Proposed | One Rust binary with embedded assets, native Linux service, no required container. |
-| D-06 | Proposed | Axum/Tokio, reqwest with rustls, rusqlite on a dedicated worker, server-rendered HTML and small JavaScript modules. Validate dependency features and actual memory use before committing to this stack. |
+| D-05 | Confirmed | One Rust binary with embedded assets, native Linux service, no required container. |
+| D-06 | Confirmed | Axum/Tokio, reqwest with rustls, rusqlite on a dedicated worker, server-rendered HTML and small JavaScript modules. Validate dependency features and actual memory use before committing to this stack. |
 | D-07 | Confirmed | HTTP/HTTPS, TCP and ping in the first release. Use unprivileged ICMP where supported; platform feasibility must be demonstrated early. |
-| D-08 | Proposed | One administrator, local first-user bootstrap, cookie sessions, no public registration. |
+| D-08 | Confirmed | One administrator, local first-user bootstrap, cookie sessions, no public registration. |
 | D-09 | Confirmed scale; proposed limits | Owner expects 10–15 services. Qualify at 15; propose a hard configuration cap of 50 plus scheduler capacity admission. Higher qualified capacity requires new evidence. |
-| D-10 | Proposed | Seven days raw probes, 90 days hourly aggregates, bounded incidents; sample-based uptime with separate coverage. |
+| D-10 | Confirmed | Seven days raw probes, 90 days hourly aggregates, bounded incidents; sample-based uptime with separate coverage. Incidents log do not get deleted after 90 days but remain for 180 days. |
 | D-11 | Confirmed infrastructure; proposed integration | Existing Nginx and WireGuard to the home network. Integrate a dedicated Nginx virtual host and loopback Rust listener; preserve current routing and other sites. |
 | D-12 | Proposed | Budget incremental service resources, extra Nginx overhead, data, logs and backup staging. Keep 256 MiB RAM conservative; disk cannot exceed 2 GiB. Host reports: 874 MiB RAM total, approximately 574 MB in use. |
 | D-13 | Confirmed | Telegram down/recovery alerts plus dashboard incidents in the first release. |
