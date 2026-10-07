@@ -20,6 +20,13 @@ Updated: 2026-10-06. "Proposed" is a planning baseline, not owner approval or a 
 | D-12 | Proposed | Budget incremental service resources, extra Nginx overhead, data, logs and backup staging. Keep 256 MiB RAM conservative; disk cannot exceed 2 GiB. Host reports: 874 MiB RAM total, approximately 574 MB in use. |
 | D-13 | Confirmed | Telegram down/recovery alerts plus dashboard incidents in the first release. |
 | D-14 | Proposed | Linux GNU target built/tested in Linux CI or WSL2. Exact distro/glibc baseline is unresolved; do not assume a Windows binary can run on Linux. |
+| D-15 | Observed gap; proposed remedy | WP-00 reproduced reqwest 0.12.28 accepting a 33 KiB HTTP/1 response header; the required 32 KiB probe-contract bound is not satisfied by the candidate client as configured. Use an HTTP probe transport exposing a parser buffer/header limit (for example Hyper with rustls), or an equivalently demonstrated solution. Keep reqwest for fixed-origin Telegram only with its separate response bounds. Do not raise the contract limit to accommodate the library. Resolve and validate before accepting the probe transport; see [WP-00 evidence](agents/reports/WP-00.md). |
+
+## WP-00 evidence reconciliation (2026-10-06)
+
+- D-06 remains the candidate stack, with Windows feasibility evidence only; Linux Rust execution and footprint are unverified. WSL Ubuntu 24.04.1/glibc 2.39 is a discovered development environment, not the selected production baseline.
+- D-07 is proven for non-elevated Windows IPv4/IPv6 loopback. The WSL non-root diagnostic found denied datagram ping permission for both families (`ping_group_range=1 0`); no sysctl, privilege or infrastructure changes were made.
+- Corrected the data model's 90-day incident age to confirmed D-10's 180 days. Its proposed 10,000 closed-incident ceiling cannot silently reduce that retention; overflow behavior remains to be resolved before WP-03.
 
 ## Questions awaiting owner input
 

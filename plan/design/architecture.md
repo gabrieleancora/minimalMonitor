@@ -29,6 +29,8 @@ One active process owns a database. No remote database, distributed scheduler, t
 
 These choices are proposals, not selected version numbers. Pin compatible versions and the toolchain during foundation work; audit advisories and licenses at that time. [Axum](https://docs.rs/axum/latest/axum/), [reqwest](https://docs.rs/reqwest/latest/reqwest/), and [rusqlite](https://docs.rs/rusqlite/latest/rusqlite/) provide the candidate capabilities; none demonstrates this application's footprint in advance.
 
+WP-00's isolated Windows prototype supports basic stack feasibility, not production qualification. The reqwest HTTP/1 client does not yet enforce the probe contract's 32 KiB header limit: D-15 calls for a demonstrated bounded transport before adopting the probe client. Linux Rust execution and successful non-root datagram echo remain missing; see [the evidence report](../agents/reports/WP-00.md).
+
 ## Runtime separation
 
 - Scheduler owns due times and bounded monitor state; four total probe slots, at most one active probe per monitor.

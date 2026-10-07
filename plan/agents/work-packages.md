@@ -1,6 +1,6 @@
 # Assignable work packages
 
-All packages are unassigned and not started. The owner selects an agent and gives the relevant package ID. This is an ordered implementation plan, not an instruction to start coding now.
+WP-00 was assigned by the owner on 2026-10-06; its [report](reports/WP-00.md) records tested Windows feasibility and an incomplete completion gate. WP-01 through WP-07 remain unassigned and not started. The owner selects an agent and gives the relevant package ID. This is an ordered implementation plan, not authorization to start a subsequent package.
 
 | ID | Suggested role | Dependencies | Deliverable / completion gate |
 | --- | --- | --- | --- |

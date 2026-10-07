@@ -1,9 +1,9 @@
 # minimalMonitor planning workspace
 
-Status: initial specification, ready for review; implementation has not started.
+Status: specification baseline with an isolated WP-00 feasibility prototype; application implementation has not started.
 Updated: 2026-10-06.
 
-This workspace contains specifications only. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
+This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records partial feasibility and remaining gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
 
 ## Reading order
 
@@ -46,3 +46,4 @@ Probe scope, Telegram, expected scale, and existing infrastructure are confirmed
 | --- | --- |
 | 2026-10-06 | Initial planning package; no application code, runnable deployment files, or agents created. |
 | 2026-10-06 | Owner confirmed ping and Telegram, 10–15 services, existing Nginx/WireGuard, and non-negotiable disk limit. |
+| 2026-10-06 | Owner assigned WP-00. Windows prototype tested; Linux tooling/permission and HTTP header-limit gaps recorded. No subsequent package or production change started. |

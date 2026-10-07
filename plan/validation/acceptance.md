@@ -1,6 +1,6 @@
 # Acceptance and release evidence
 
-No checks below have been executed: this is a planning-only repository. Future agents record commands, environment, observed results and artifacts in their work-package reports. A release needs passing applicable gates, not statements that tests should pass.
+The [WP-00 report](../agents/reports/WP-00.md) records partial Windows feasibility checks and a read-only Linux permission diagnostic; none of the complete release gates below has passed. Future agents record commands, environment, observed results and artifacts in their work-package reports. A release needs passing applicable gates, not statements that tests should pass.
 
 ## Functional and security gates
 
@@ -20,6 +20,8 @@ No checks below have been executed: this is a planning-only repository. Future a
 
 ## Concrete behavioral cases
 
+- Reject HTTP response headers exceeding 32 KiB through an enforced parser limit; exercise large single and cumulative headers. WP-00's characterization test reproduces a candidate-client gap and does not pass this acceptance case (D-15).
+- Retain incidents for confirmed D-10's 180-day window. Resolve bounded overflow behavior before WP-03; a proposed row ceiling cannot silently substitute 90-day or shorter retention.
 - Success, failure, failure, failure opens exactly one incident at the third failure; next success closes it. Raw sample-based availability for that sequence is 2/5 = 40%, regardless of incident threshold.
 - Four completed results in five expected enabled slots, three successful, show 75% availability and 80% coverage. With no completed result, availability is N/A; with no enabled slot, coverage is N/A.
 - Paused time is excluded; a process outage produces unknown slots. Reboot, clock jumps, interval edits and late results cannot duplicate observations or inflate availability.

@@ -39,7 +39,7 @@ WAL needs checkpoints, and long read transactions can prevent recycling; keep tr
 | --- | --- |
 | Raw probe results | Seven days; at most 1,010,000 rows globally |
 | Hourly aggregates | 90 days; at most 108,000 monitor/hour rows |
-| Incidents | 90 days or 10,000 closed incidents, whichever is smaller; retain current open incidents |
+| Incidents | 180 days (confirmed D-10); retain current open incidents. The proposed 10,000 closed-incident bound must not silently shorten confirmed retention; overflow behavior needs resolution before WP-03. |
 | Schedule epochs | 90 days plus the epoch covering the earliest retained boundary; cap 10,000 rows |
 | Audit events | 30 days or 5000 rows, whichever is smaller |
 | Sessions | Expire promptly and cap at five |

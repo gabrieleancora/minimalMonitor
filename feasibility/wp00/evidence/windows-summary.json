@@ -1,0 +1,7 @@
+{
+  "exit_code": 0,
+  "sample_count": 337,
+  "observed_peak_working_set_bytes": 30547968,
+  "executable_bytes": 3368960,
+  "final_state_bytes": 8192.0
+}

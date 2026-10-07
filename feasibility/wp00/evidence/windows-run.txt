@@ -1,0 +1,10 @@
+sqlite_version=3.50.2
+tls=trusted_accept,untrusted_reject,wrong_hostname_reject
+ping_127.0.0.1=Ok(())
+ping_::1=Ok(())
+local_probes=15_passed,slots=4
+phase=idle
+argon2_exercise_ms=36
+phase=after_hash
+sqlite=commit,rollback,reopen_passed
+wp00=passed
