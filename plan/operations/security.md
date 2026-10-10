@@ -18,6 +18,11 @@ Upstream mitigation matters because host-local request limits cannot recover a s
 
 ## Authentication and sessions
 
+WP-02 implements this baseline; [evidence](../agents/reports/WP-02.md) and
+[operator commands](../../README.md#account-and-destination-security) describe
+the intermediate build. No monitoring transports, Telegram sender, full GUI or
+production proxy integration is supplied by this package.
+
 - Bootstrap the only admin through a local interactive command; no default credentials, unauthenticated setup route, or open signup. Prompt securely rather than putting passwords in process arguments or logs.
 - Local bootstrap/reset acquires exclusive process ownership with the service stopped. A reset revokes sessions before restart; it does not create a second concurrent database/scheduler owner.
 - Use Argon2id with a starting minimum of 19 MiB, two iterations, one lane, unique random salt and stored parameters. Benchmark on the host and retain only one concurrent hash operation; reject excess work rather than queue indefinitely. This baseline comes from [OWASP password-storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
@@ -27,6 +32,36 @@ Upstream mitigation matters because host-local request limits cannot recover a s
 - Expire after two hours idle or 24 hours absolute, whichever first; cap five active sessions, revoking oldest when exceeded. Rotate token on login. Logout, local reset and password change revoke affected sessions immediately. Password change requires the current password and invalidates all sessions.
 - Enforce authorization centrally for every private route. Use a production canonical origin/host allowlist; do not trust arbitrary Host or forwarded headers.
 - Protect all mutations, including login/logout, with CSRF tokens and origin checks. Use a signed, short-lived pre-auth token/cookie flow without an unbounded anonymous session table. SameSite is an additional defense, not the sole control. [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
+
+Implementation details: Argon2id v19 fixes m=19456 KiB, t=2, p=1, a random
+16-byte salt and 32-byte output. Stored parameters are checked before verification
+so corrupt data cannot request arbitrary hashing memory. Username normalization
+trims outer whitespace and folds ASCII case; non-ASCII spelling is retained.
+Password input is never truncated. Credential JSON bodies have a 1024-byte limit.
+Only a successfully verified snapshot with the current credential generation can
+create a session or change the password. All account/session writes recheck
+storage admission inside the SQLite worker and acknowledge only a committed
+transaction. Success audit metadata is bounded to 5000 rows/30 days; denials
+increment an in-memory counter without durable per-request logs.
+
+Preauth uses HMAC-SHA256 under a random per-process key over an issued timestamp
+and random 256-bit nonce, expires at five minutes and requires the identical
+cookie/header token plus canonical Origin. Restart invalidates outstanding
+preauth tokens. A fresh session token and separate random CSRF binding follow
+successful login; only the session token's SHA-256 is stored. Authenticated CSRF
+is returned by the login response or private account-session endpoint.
+Production cookies are `__Host-mm-session` and `__Host-mm-preauth`. Explicit
+loopback HTTP development uses `mm-dev-session`/`mm-dev-preauth` without Secure;
+this exception is never selected for production or an HTTPS development origin.
+Cookies are HttpOnly/SameSite=Lax, Path=/, with no Domain in either mode.
+
+Session activity is persisted at most once per minute. Idle expiry uses that
+persisted checkpoint and can conservatively expire up to one minute before the
+last in-memory request's two-hour anniversary; no expiry is extended beyond the
+24-hour absolute limit. Clock rollback invalidates affected sessions. Expired
+rows are pruned by bounded maintenance and before new sessions. Reset/password
+change revoke all sessions atomically; login evicts oldest sessions before the
+sixth insertion. Private routes fail closed if activity cannot be persisted.
 
 ## Application limits
 
@@ -44,6 +79,37 @@ Validate resolved addresses at connection time, connect only to validated addres
 
 TLS certificate validation is mandatory for HTTPS and Telegram. Do not let process environment variables silently route checks through an unexpected proxy. Exact private network permissions are deployment inputs, not a reason to modify the existing WireGuard topology.
 
+WP-02 configuration accepts at most 64 `[[destination_rules]]` entries. Each
+contains a CIDR, optional normalized host, up to 64 nonzero ports, and optional
+`ping` (default false). At least one port or ping permission is required. IPv4
+mapped CIDRs are rejected; mapped answers are normalized before matching.
+Private RFC1918/ULA/shared-address destinations require a matching rule; loopback
+requires an exact /32 or /128 grant. Link-local/metadata, unspecified, multicast,
+global broadcast, documentation and transition/special-use address ranges remain
+denied even under a broad grant. Known cloud-internal endpoints
+100.100.100.200/168.63.129.16 are hard-denied. AWS's IPv6 metadata endpoint
+`fd00:ec2::254` is also hard-denied before ULA classification or any grant,
+including broad CIDRs and exact host/address permissions. See
+[AWS's metadata documentation](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instancedata-data-retrieval.html).
+IPv4 CIDR network/broadcast addresses
+are excluded from matching private grants with prefixes shorter than /31.
+Only global unicast 2000::/3 outside the excluded IPv6 special-use ranges is
+allowed by default. These conservative exclusions are not a complete future
+registry-update promise.
+
+The shared target parser rejects credentials, fragments, unsupported schemes,
+control/whitespace characters, ambiguous numeric hosts and repaired authorities.
+`Policy::authorize` has a defensive library ceiling of 32 supplied addresses,
+rejects any denied member, and returns a capability with normalized numeric addresses and
+the original normalized TLS hostname. Literal targets must match every answer.
+Monitoring transports retain the stricter [eight-answer limit](../design/monitoring.md#probe-definitions):
+WP-03 must reject an entire result containing more than eight DNS answers, without
+truncating to eight or selecting an allowed subset. It must resolve once under
+bounded admission/deadline, pass every accepted answer to the policy before
+family selection, and connect only to capability addresses on
+every attempt. No resolver or probe transport is implemented in WP-02; live
+rebinding, redirects and verified TLS must additionally be tested at that boundary.
+
 ## Browser and secrets
 
 Use automatic HTML escaping, no rendering target data as HTML, parameterized SQL and a restrictive CSP (`self` assets, no framing, no objects, no unsafe inline script). Add no-sniff, a restrictive referrer policy and `Cache-Control: no-store` for authenticated HTML/API data. All resources are local except server-side Telegram/target connections.
@@ -53,6 +119,17 @@ Telegram token lives in a service-readable secret file with restrictive permissi
 ## Host and proxy requirements
 
 - Only Nginx publishes the dashboard; Rust binds loopback. Trust proxy identity headers only from the configured local Nginx peer, which overwrites incoming forwarded values.
+
+WP-02 accepts optional `trusted_proxy` as one loopback IP. A matching socket peer
+must supply exactly one numeric `X-Real-IP` on non-health routes; absent, duplicate
+or malformed values are rejected. All other peers use their accepted socket IP;
+without the option all identity headers are ignored. `X-Forwarded-For`,
+`X-Forwarded-Host` and `X-Forwarded-Proto` never grant authority. Nginx integration
+must overwrite `X-Real-IP` and forward the canonical Host. Non-health Host must
+exactly match the configured origin's authority, and mutations require its exact
+Origin. Absolute-form request targets are rejected. Health uses socket locality
+alone and must be excluded from Nginx publishing. A trusted local proxy is an
+operator trust boundary, not proof of external-client identity by itself.
 - Add limits to the monitor virtual host, not all existing sites. Initial Nginx candidates: five requests/second per IP with burst ten; five login requests/minute with burst five; ten concurrent requests/connections per IP and a measured virtual-host aggregate limit. Verify actual HTTP/2 behavior and all existing shared-host constraints. [Nginx request](https://nginx.org/en/docs/http/ngx_http_limit_req_module.html) and [connection](https://nginx.org/en/docs/http/ngx_http_limit_conn_module.html) limit modules provide these controls.
 - Terminate TLS in existing Nginx; verify renewal, HTTP-to-HTTPS redirect and host matching. Enable HSTS only after checking the site's HTTPS behavior; do not blindly add includeSubDomains or preload to the owner's domains.
 - Run as a dedicated non-root user. Restrict writes to state/runtime directories. Use no-new-privileges, restrictive umask, filesystem protections and a restart policy compatible with the installed systemd version. Review sandbox controls against DNS, certificate reads and ping before enabling them.

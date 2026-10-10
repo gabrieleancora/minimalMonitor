@@ -2,7 +2,15 @@
 
 Route names are proposed contracts for frontend/backend coordination. Version the JSON API as `/api/v1`; server-rendered pages may call it through small JavaScript modules. All monitoring data is private.
 
-WP-01's intermediate foundation serves only the two local health routes below. Other routes return a bounded 404 error and expose no monitoring information. This does not replace the authentication/API work assigned to WP-02/WP-05. Liveness and readiness use the accepted socket peer, never forwarded headers. Nginx must exclude the health routes because the proxy itself connects locally. Readiness currently means a fresh database-worker response and write admission; later packages must extend it for their implemented workers without treating target or Telegram failures as process failure.
+WP-01 established the two local health routes. WP-02 adds the login, logout,
+account-session and password-change routes plus central protection for every
+remaining path, including unknown/pending routes. Unauthenticated pages redirect
+to login; API requests receive 401. Authenticated pending feature routes return
+a bounded 501 without inventing monitoring data. Monitoring, notifications and
+the full GUI remain WP-03–WP-05. New feature routes must be assembled inside the
+protected router before its guard is applied and extend the private-route tests.
+Liveness/readiness use socket locality alone. Nginx must exclude both paths;
+readiness still means storage-worker progress/admission, not future workers.
 
 ## Pages and operations
 
@@ -11,6 +19,7 @@ WP-01's intermediate foundation serves only the two local health routes below. O
 | `GET /login` | Public | Login form and CSRF bootstrap; no monitor data |
 | `POST /auth/login` | Public + pre-auth CSRF/origin checks | Bounded credentials; generic failure; rotate into authenticated session |
 | `POST /auth/logout` | Session + CSRF | Revoke session and clear cookie |
+| `GET /api/v1/account/session` | Session | Return current CSRF token only; no session token/hash or account credentials |
 | `GET /` | Session | Dashboard shell and initial bounded summary |
 | `GET /monitors/{id}` | Session | Detail page |
 | `GET /settings` | Session | Account, appearance, Telegram status, operational health |
@@ -34,6 +43,13 @@ Appearance preference is local to the browser and does not need a database write
 
 - Same-origin requests only; no permissive CORS. Mutations use JSON and a CSRF header; login form has equivalent protection.
 - Default body limit 16 KiB, request-header budget 16 KiB, normal request timeout five seconds, and 16 concurrent web requests. Hash work has separate admission. Enforce limits at both proxy and application boundaries where applicable.
+- Login and password-change JSON have a stricter 1024-byte encoded body limit.
+  Unknown fields, duplicate credential fields and invalid JSON are rejected with
+  safe errors. Login accepts `username`/`password`; password change accepts
+  `current_password`/`new_password`. Successful login returns `csrf_token` and
+  sets a new session cookie; logout/change return 204 after durable revocation.
+  `/login` contains a public minimal form and signed preauth token; its local
+  `/assets/login.js` posts JSON and uses safe text for errors. Full GUI is WP-05.
 - URL length <= 2048 bytes, host <= 253 characters, port 1–65535, monitor name <= 100 characters. Reject userinfo, fragments, unsupported schemes, control characters and ambiguous target parsing. Error text returned to clients <= 256 characters.
 - Telegram chat ID is validated and stored in a type that preserves its full signed value. No arbitrary destination URL or token field in the browser API.
 - API responses <= 256 KiB. History bounds: maximum 90-day window, declared granularity and coverage, no more than 300 points. Raw-detail views, if added later, require separate bounded pagination.
@@ -41,6 +57,12 @@ Appearance preference is local to the browser and does not need a database write
 - Use version/revision checks to prevent stale forms overwriting newer settings. For retryable create requests, client idempotency keys prevent duplicate monitors; retain at most 100 keys for 24 hours.
 
 ## Error shape and browser behavior
+
+The [security contract](../operations/security.md) specifies canonical Host and
+Origin, trusted proxy identity and cookie names. Current security routes accept
+no query parameters or absolute-form request targets. Future history/pagination
+routes must replace that query refusal with their own bounded validation.
+Rate/busy responses carry Retry-After; no raw extractor/SQL/OS text is returned.
 
 Return a stable error code, safe human-readable message, optional field errors, and request ID. Use 400/422 for malformed/invalid data, 401 unauthenticated, 403 CSRF/authorization, 404 missing, 409 revision/capacity conflicts, 413 oversized, 429 rate-limited, and 503 busy/degraded. Do not return stack traces, SQL, paths or full outbound URLs.
 

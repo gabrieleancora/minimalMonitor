@@ -1,0 +1,36 @@
+{
+  "package": "WP-02",
+  "revision": "metadata-review-fix",
+  "checks": {
+    "fmt": "0",
+    "clippy": "0",
+    "test": "0",
+    "release": "0",
+    "version": "0",
+    "lifecycle": "0",
+    "interactive": "0"
+  },
+  "passed_tests": 34,
+  "unit_tests": 31,
+  "integration_tests": 3,
+  "lifecycle": {
+    "platform": "linux",
+    "passed": true,
+    "seconds": 1.177,
+    "binary_bytes": 2715256,
+    "binary_sha256": "a8104b26a270f8d0b8a5ab96693b4a714c1c028899d98f23d8a08713300c680c",
+    "state_bytes": 126976,
+    "linux_sigterm": true,
+    "windows_forced_exit": false
+  },
+  "compiler": "1.99.0",
+  "target": "x86_64-unknown-linux-gnu",
+  "libc": "glibc 2.43",
+  "interactive": {
+    "status": "pass",
+    "interactive_bootstrap_reset": true,
+    "terminal_no_echo": true,
+    "http_login_logout_reset_revocation": true,
+    "linux_sigterm": true
+  }
+}

@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::{
     fs::File,
     io::Read,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::{Path, PathBuf},
 };
 use url::Url;
@@ -25,6 +25,9 @@ struct RawConfig {
     listen: SocketAddr,
     state_dir: PathBuf,
     public_origin: String,
+    trusted_proxy: Option<IpAddr>,
+    #[serde(default)]
+    destination_rules: Vec<crate::destination::Rule>,
 }
 
 /// Deliberately lacks Debug: configuration may contain sensitive hostnames.
@@ -33,6 +36,8 @@ pub struct Config {
     pub listen: SocketAddr,
     pub state_dir: PathBuf,
     pub public_origin: Url,
+    pub destination_policy: crate::destination::Policy,
+    pub trusted_proxy: Option<IpAddr>,
 }
 
 impl Config {
@@ -70,6 +75,7 @@ impl Config {
             || origin.path() != "/"
             || origin.port() == Some(0)
             || raw.state_dir.as_os_str().is_empty()
+            || raw.trusted_proxy.is_some_and(|ip| !ip.is_loopback())
         {
             return Err(Error::Configuration);
         }
@@ -90,6 +96,8 @@ impl Config {
             listen: raw.listen,
             state_dir,
             public_origin: origin,
+            destination_policy: crate::destination::Policy::new(raw.destination_rules)?,
+            trusted_proxy: raw.trusted_proxy,
         })
     }
 }
@@ -104,6 +112,8 @@ mod tests {
             listen: listen.parse().unwrap(),
             state_dir: "state".into(),
             public_origin: origin.into(),
+            destination_rules: Vec::new(),
+            trusted_proxy: None,
         }
     }
 
@@ -155,6 +165,21 @@ mod tests {
         );
         std::fs::write(&path, format!("{text}insecure_tls=true\n")).unwrap();
         assert!(Config::load(&path).is_err());
+        std::fs::write(&path, format!("{text}trusted_proxy='8.8.8.8'\n")).unwrap();
+        assert!(Config::load(&path).is_err());
+        std::fs::write(&path, format!("{text}trusted_proxy='127.0.0.1'\n[[destination_rules]]\ncidr='10.0.0.0/24'\nhost='home.invalid'\nports=[443]\nping=true\n")).unwrap();
+        let configured = Config::load(&path).unwrap();
+        assert!(configured.trusted_proxy.is_some());
+        assert!(
+            configured
+                .destination_policy
+                .authorize(
+                    &crate::destination::Target::tcp("home.invalid", 443).unwrap(),
+                    &["10.0.0.2".parse().unwrap()]
+                )
+                .is_ok()
+        );
+        assert!(!dir.path().join("state").exists());
         std::fs::write(&path, "x".repeat(MAX_CONFIG_BYTES as usize + 1)).unwrap();
         assert!(Config::load(&path).is_err());
         assert!(

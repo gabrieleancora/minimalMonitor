@@ -31,6 +31,51 @@ The [WP-01 report](../agents/reports/WP-01.md) records passing scoped evidence f
 
 Repeatable runners and retained summary evidence live under [validation/wp01](../../validation/wp01/README.md). These cases clarify the package gate; they do not relax the full release acceptance criteria or the 256 MiB/2 GiB budgets.
 
+## WP-02 security evidence
+
+The [WP-02 report](../agents/reports/WP-02.md) records the owner-assigned backend
+security scope. This is scoped V-03 and V-06 evidence, not full release approval:
+
+- Windows and real x86_64 Fedora fmt, warning-denied clippy, tests, release build
+  and release execution, with retained environment/exit/test/lifecycle evidence.
+- Local commands share persistent ownership, refuse piped/argument credentials,
+  have no default/public bootstrap and atomically reset/revoke sessions. Linux
+  PTY evidence verifies real prompts, password confirmation/no echo, existing
+  account refusal, bootstrap/reset, HTTP login/logout and reset revocation after
+  restart. Direct Windows terminal no-echo and graceful Windows console/service
+  lifecycle remain explicit unrun platform checks; Windows storage/API lifecycle
+  and noninteractive command refusal are tested.
+- Fixed Argon2id parameters, random salts/tokens, generic unknown-user/password
+  failures, bounded hashing and retained permits after cancellation. Login IP
+  map capacity/expiry, global refill/admission, 429/Retry-After, and password
+  change's shared global hash budget are tested without uncontrolled traffic.
+- All declared private paths/methods and unknown APIs reject anonymous access;
+  browser pages redirect. Cookie flags, fixation, signed preauth tamper/expiry,
+  canonical Host/Origin, authenticated CSRF, logout/change/reset, persisted
+  sessions, exact stored-clock idle/absolute boundaries, oldest eviction and
+  stale credential generations are tested. The conservative one-minute activity
+  checkpoint behavior is documented in the security contract.
+- Trusted proxy identity requires explicit matching socket peer and exactly one
+  numeric X-Real-IP; spoofed X-Forwarded values cannot grant access. Credential
+  body/header/general-body bounds, malformed input, safe redaction, CSP and
+  no-store responses retain foundation protections. Actual account writes fail
+  under a pinned WAL and resume on the same worker after reclamation.
+- Destination parsing/policy tests cover public/private v4/v6, host/port/ping
+  grants, hard-denied metadata/special-use classes, mapped addresses, mixed and
+  changed answer sets, answer caps and literal/answer mismatch. Regression cases
+  must hard-deny `fd00:ec2::254` for literal HTTP/HTTPS/TCP/ping, hostname DNS
+  answers, mixed answer orderings, broad/exact-address/host grants, while preserving
+  ordinary granted ULA destinations. WP-03 must reject whole DNS answer sets over
+  eight without truncating or filtering; the policy helper's 32-address ceiling
+  is a separate defensive bound. WP-03 must add
+  live DNS/rebinding, numeric-address connection, redirect and TLS evidence for
+  every transport/retry path. SQL is parameterized; full target-data XSS rendering
+  belongs to WP-05/WP-07. No Telegram secret or outbound transport exists yet.
+
+Repeatable runners and summaries live under [validation/wp02](../../validation/wp02/README.md).
+The full 256 MiB incremental RAM/2 GiB disk envelope, Nginx and WireGuard release
+gates remain unchanged and unqualified by these bounded security tests.
+
 ## Concrete behavioral cases
 
 - Reject HTTP/1 wire response header blocks exceeding 32 KiB through an enforced parser limit; accept the exact boundary and exercise single, cumulative, fragmented, unterminated and excess-count headers over HTTP/HTTPS. WP-00's Hyper tests pass this scoped feasibility case (D-15). The retained test-only reqwest characterization still reproduces the old gap and is not production probe acceptance evidence.

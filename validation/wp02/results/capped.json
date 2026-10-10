@@ -1,0 +1,26 @@
+{
+  "scenario": "short release bootstrap/login/logout/reset",
+  "seconds": 5.685,
+  "samples": 1057,
+  "rust_sampled_peak_rss_bytes": 25559040,
+  "scope_sampled_peak_current_bytes": 40017920,
+  "scope_kernel_peak_bytes": 40017920,
+  "scope_swap_bytes": 0,
+  "scope_events": {
+    "low": 0,
+    "high": 0,
+    "max": 0,
+    "oom": 0,
+    "oom_kill": 0,
+    "oom_group_kill": 0,
+    "sock_throttled": 0
+  },
+  "scope_includes_python_and_setup": true,
+  "exercise": {
+    "status": "pass",
+    "interactive_bootstrap_reset": true,
+    "terminal_no_echo": true,
+    "http_login_logout_reset_revocation": true,
+    "linux_sigterm": true
+  }
+}

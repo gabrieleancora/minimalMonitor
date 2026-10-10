@@ -14,6 +14,11 @@ pub enum Error {
     Unavailable,
     Deadline,
     WorkerStopped,
+    InvalidInput,
+    Unauthorized,
+    Forbidden,
+    Conflict,
+    RateLimited,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -31,6 +36,11 @@ impl Error {
             Self::Unavailable => "not_ready",
             Self::Deadline => "deadline_exceeded",
             Self::WorkerStopped => "worker_stopped",
+            Self::InvalidInput => "invalid_input",
+            Self::Unauthorized => "authentication_required",
+            Self::Forbidden => "forbidden",
+            Self::Conflict => "conflict",
+            Self::RateLimited => "rate_limited",
         }
     }
 }

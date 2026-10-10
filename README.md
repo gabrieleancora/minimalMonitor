@@ -1,10 +1,12 @@
 # minimalMonitor
 
-WP-01 backend foundation for a small Rust/SQLite monitor. This intermediate build
-serves only local `/health/live` and `/health/ready` routes. Authentication,
-monitoring, Telegram and the GUI belong to separately assigned work packages.
-There is no administrator seed, setup route or monitoring data endpoint. It is
-not a production release. See [the plan](plan/README.md).
+WP-01 foundation and WP-02 security backend for a small Rust/SQLite monitor.
+This intermediate build provides local account commands, a minimal login form,
+cookie sessions, CSRF, protected account endpoints and destination validation.
+Monitoring, Telegram and the dashboard GUI remain separate packages.
+Authenticated requests to pending feature routes return a safe 501; no monitor
+status is fabricated. This is not a production release. See
+[the plan](plan/README.md) and [WP-02 evidence](plan/agents/reports/WP-02.md).
 
 ## Build and validate
 
@@ -17,11 +19,11 @@ cargo fmt --all -- --check
 cargo clippy --locked --all-targets -- -D warnings
 cargo test --locked
 cargo build --release --locked
-python validation/wp01/lifecycle.py target/release/minimalmonitor.exe
+python validation/wp02/lifecycle.py target/release/minimalmonitor.exe
 ```
 
 Use `target/release/minimalmonitor` and `python3` on Linux. For the documented
-remote development machine, run `bash validation/wp01/run-linux.sh` from the
+remote development machine, run `bash validation/wp02/run-linux.sh` from the
 approved project root. The runner records evidence and uses its existing stable
 toolchain; it installs no shared tooling. The Windows session also used the
 existing stable alias (Rust 1.98.1), because no separately named 1.98.1 toolchain
@@ -29,6 +31,7 @@ was installed. To use that existing installation without downloading another:
 
 ```powershell
 $env:RUSTUP_TOOLCHAIN = 'stable'
+$env:RUSTUP_AUTO_INSTALL = '0'
 $env:CARGO_HOME = Join-Path (Get-Location) '.cargo'
 ```
 
@@ -37,7 +40,7 @@ record `rustc -Vv` when using it. Prefer the pinned toolchain in ordinary builds
 Build products, Cargo downloads, temporary state and raw validation evidence are
 development artifacts and are excluded from shipment.
 
-`python validation/wp01/dependency_review.py` records licenses from Cargo metadata
+`python validation/wp02/dependency_review.py` records licenses from Cargo metadata
 and checks every registry package/version in the lockfile against OSV. This
 requires network access and is a known-advisory check, not a security proof.
 
@@ -47,6 +50,8 @@ requires network access and is a known-advisory check, not a security proof.
 minimalmonitor --version
 minimalmonitor check-config config/development.toml
 minimalmonitor serve config/development.toml
+minimalmonitor admin-bootstrap config/development.toml
+minimalmonitor admin-reset config/development.toml
 ```
 
 `check-config` reads and validates at most 16 KiB, emits no configuration values,
@@ -61,12 +66,13 @@ checkpoint/close SQLite. Startup errors return exit 1 with a safe category.
 | `listen` | Required loopback IPv4/IPv6 address and nonzero port in both modes |
 | `state_dir` | Required path; relative paths resolve against the config file's directory |
 | `public_origin` | Required origin without credentials, path other than `/`, query or fragment; HTTPS in production, loopback HTTP additionally allowed in development |
+| `trusted_proxy` | Optional loopback IP; only this socket peer's single numeric `X-Real-IP` is accepted. Nginx must overwrite it. Omit to ignore identity headers. |
+| `destination_rules` | Optional operator-only private destination grants; see below |
 
 Unknown fields are rejected. No environment proxy, secrets or runtime bounds are
-silently inherited. Destination permissions/trust roots are WP-02/WP-03 inputs;
-Telegram secret-file configuration belongs to WP-04. This build performs no
-outbound checks or sends. Future packages must add their validated configuration
-contracts rather than accepting arbitrary fields now.
+silently inherited. Telegram secret-file configuration belongs to WP-04.
+This build performs no outbound checks or sends; WP-03 must consume validated
+numeric addresses and preserve the TLS hostname without resolving again.
 
 On Linux, state directories must be private (0700) and existing state files must
 exclude group/other access. Newly created lock/database/snapshot files use 0600;
@@ -82,6 +88,47 @@ a local reverse proxy is itself a local socket peer. Readiness confirms a fresh
 database-worker round trip and write admission, not target status or future
 workers that have not been implemented.
 
+## Account and destination security
+
+Stop the service before bootstrap/reset. Both commands take the same persistent
+ownership lock before prompting, require an interactive terminal, hide typed
+credentials, confirm the new password and accept no credential arguments or
+environment variables. Bootstrap refuses an existing account; reset refuses an
+absent account. Reset and password changes atomically advance the credential
+generation and revoke every session. State files contain password hashes and
+operational data and must remain private.
+
+Visit `/login` at the configured origin. The form uses a signed five-minute
+preauth cookie/token and a local script to submit JSON with `X-CSRF-Token`.
+Successful login issues a fresh opaque session and returns its CSRF binding.
+`GET /api/v1/account/session` returns only the current CSRF token.
+`POST /auth/logout` and `POST /api/v1/account/password` require the session,
+canonical Origin and CSRF header. Password change JSON contains
+`current_password` and `new_password`. Credential JSON is capped at 1024 bytes;
+other bodies at 16 KiB. There is no public registration or setup endpoint.
+
+Production uses Secure/HttpOnly/SameSite=Lax `__Host-` cookies with Path=/ and no
+Domain. Explicit loopback HTTP development uses separate `mm-dev-*` cookie names.
+Every non-health request must supply the canonical Host; mutations additionally
+require the canonical Origin. Nginx must forward the canonical Host, and overwrite
+`X-Real-IP` if `trusted_proxy` is set. Without a trusted proxy, limits group
+requests by accepted socket IP. See the authoritative
+[security contract](plan/operations/security.md) for password parameters, session
+expiry, admission and proxy responsibilities.
+
+Operator grants are optional TOML arrays. Each `[[destination_rules]]` requires
+`cidr`; it may narrow `host`, list `ports`, and set `ping=true`. At most 64 rules
+and 64 ports per rule are accepted. Private destinations require a matching rule
+for the protocol/port and optional hostname. Loopback additionally requires /32
+or /128. Hard-denied address classes cannot be overridden. No browser endpoint
+can change these rules. Public unicast is allowed. URL queries may be monitored
+but never formatted into diagnostics. The [policy module](src/destination.rs)
+rejects mixed DNS answers and returns at most 32 validated numeric addresses;
+monitoring transports still reject whole DNS resolutions exceeding eight
+answers, without truncation. WP-03 owns bounded resolution, transports, TLS and
+redirect suppression. AWS IPv6 metadata `fd00:ec2::254` is unconditionally denied
+even under a private destination grant.
+
 ## Bounds and persistence handoff
 
 The runtime has two async workers, two maximum blocking helpers, one dedicated
@@ -90,12 +137,13 @@ SQLite thread and 128 queued database commands. Database admission uses
 Excess work returns an explicit safe error. Query progress cancellation and a
 two-second SQLite busy timeout keep expensive/contended work off async workers.
 Shared nonwaiting permits reserve four probes, one password hash and one alert
-sender for later packages; those operations are not implemented here.
+sender. WP-02 holds the hash permit on a blocking task through completion even
+after request cancellation. Probe and alert workers remain later packages.
 
 HTTP/1 accepts at most 16 active connections, including slow header readers and
 response writers. It closes after one request, enforces 16 KiB header and body
 budgets plus a five-second connection deadline, and closes excess connections.
-Fixed health/error bodies remain well below the 256 KiB response limit. Health
+Fixed health/error/login/account bodies remain below the 256 KiB response limit. Health
 routes accept no query or request body. Normal application errors have a stable
 code, safe message and generated request ID. Malformed HTTP rejected by Hyper
 can use its protocol response rather than an application error envelope.

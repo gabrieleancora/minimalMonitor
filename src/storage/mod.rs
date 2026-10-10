@@ -1,4 +1,5 @@
 mod migrations;
+pub mod security;
 
 use rusqlite::Connection;
 use std::{
@@ -28,6 +29,10 @@ struct Command {
     deadline: Instant,
     reply: oneshot::Sender<Result<StorageHealth>>,
 }
+enum Work {
+    Health(Command),
+    Security(security::Command),
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StorageHealth {
@@ -37,7 +42,7 @@ pub struct StorageHealth {
 
 #[derive(Clone)]
 pub struct StorageClient {
-    tx: SyncSender<Command>,
+    tx: SyncSender<Work>,
     stopping: Arc<AtomicBool>,
 }
 
@@ -48,7 +53,7 @@ pub struct Storage {
 
 impl Storage {
     pub async fn start(owner: StateOwner) -> Result<Self> {
-        let (tx, rx) = mpsc::sync_channel::<Command>(DATABASE_QUEUE);
+        let (tx, rx) = mpsc::sync_channel::<Work>(DATABASE_QUEUE);
         let (ready_tx, ready_rx) = oneshot::channel();
         let stopping = Arc::new(AtomicBool::new(false));
         let worker_stopping = stopping.clone();
@@ -79,6 +84,13 @@ impl Storage {
                         }
                     };
                     if let Some(command) = command {
+                        let command = match command {
+                            Work::Health(command) => command,
+                            Work::Security(command) => {
+                                security::dispatch(&mut connection, root, command);
+                                continue;
+                            }
+                        };
                         if command.reply.is_closed() {
                             continue;
                         }
@@ -91,7 +103,10 @@ impl Storage {
                     } else {
                         // Short periodic maintenance; readiness always performs a
                         // fresh round-trip, so a dead/stalled worker cannot look ready.
-                        let _ = health(&mut connection, root, Instant::now() + QUERY_TIME);
+                        if health(&mut connection, root, Instant::now() + QUERY_TIME).is_ok_and(|h| h.writable)
+                            && let Ok(now)=crate::auth::now_ms() {
+                            let _=connection.execute("DELETE FROM sessions WHERE expires_at_ms<=?1 OR last_used_at_ms<=?2 OR created_at_ms>?1 OR last_used_at_ms>?1",rusqlite::params![now,now-crate::auth::IDLE_MS]);
+                        }
                     }
                 }
                 connection
@@ -172,8 +187,8 @@ impl StorageClient {
     }
 }
 
-fn enqueue(tx: &SyncSender<Command>, command: Command) -> Result<()> {
-    tx.try_send(command).map_err(|err| match err {
+fn enqueue(tx: &SyncSender<Work>, command: Command) -> Result<()> {
+    tx.try_send(Work::Health(command)).map_err(|err| match err {
         TrySendError::Full(_) => Error::Busy,
         TrySendError::Disconnected(_) => Error::WorkerStopped,
     })

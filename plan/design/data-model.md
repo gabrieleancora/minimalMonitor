@@ -1,6 +1,6 @@
 # Data model and persistence
 
-This document remains the logical contract. WP-01 adds [foundation migration 1](../../migrations/0001_foundation.sql) outside `plan`; its [report](../agents/reports/WP-01.md) records executable schema and migration evidence. Feature mutation, retention, aggregation and notification behavior remains WP-02 through WP-04 work. Use UTC timestamps, monotonic clocks for in-process elapsed time, parameterized SQL, explicit constraints and versioned migrations.
+This document remains the logical contract. WP-01 adds [foundation migration 1](../../migrations/0001_foundation.sql) outside `plan`; its [report](../agents/reports/WP-01.md) records executable schema and migration evidence. WP-02 implements transactional account/session mutations and bounded security audit metadata on the same worker, without changing the schema; see its [report](../agents/reports/WP-02.md) and [security contract](../operations/security.md). Monitoring retention, aggregation and notifications remain WP-03/WP-04. Use UTC timestamps, monotonic clocks for in-process elapsed time, parameterized SQL, explicit constraints and versioned migrations.
 
 ## Entities
 
@@ -26,6 +26,17 @@ Foreign keys apply consistently. Index probe results by monitor/time, incidents 
 An idempotency key reused with a different request digest is a conflict. A matching retry returns the already committed result without a second mutation. Evicted or expired keys provide no deduplication guarantee; clients must not automatically retry a create beyond that window.
 
 ## Transactions and worker behavior
+
+WP-02 account/session operations share the existing 128-command worker channel
+and execution/reply deadlines. Account reads are single-row; each mutation
+rechecks checkpoint/disk admission on the worker, then uses a short transaction.
+Reset/password change atomically update the hash/generation, delete all sessions
+and add bounded audit metadata. Login checks the verified credential generation
+again before deleting expired/oldest sessions and inserting the new token hash.
+Password change also revalidates its session at commit time. Stale verification
+cannot restore access after a credential change. Expired session rows are pruned
+by healthy idle maintenance and login. Audit writes retain at most 5000 rows and
+30 days. Failed/denied web requests create no durable audit row or per-request log.
 
 Use one database worker/connection initially. Updating a result, state, hourly counters and any incident/outbox transition is one short transaction. A command rejected because the bounded channel is full produces explicit degradation; never acknowledge unsaved configuration. Periodic housekeeping is chunked (up to 500 rows per transaction) and yields to result writes. All web history reads are paginated or aggregated, never full-history exports.
 

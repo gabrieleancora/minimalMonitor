@@ -1,11 +1,16 @@
 # minimalMonitor planning workspace
 
-Status: specification baseline, completed WP-00 feasibility and completed WP-01 backend foundation; later application packages have not started.
+Status: specification baseline, completed WP-00 feasibility, WP-01 foundation and WP-02 backend security; later packages have not started.
 Updated: 2026-10-10.
 
 This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records completed implementation feasibility and remaining application release gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
 
-The owner assigned the Rust backend agent WP-01 on 2026-10-10. The [application foundation](../README.md) and its [WP-01 report](agents/reports/WP-01.md) cover configuration, ownership, bounded workers, schema/migrations, local health and Windows/Fedora validation. This intermediate build is not a deployable monitoring release; WP-02 through WP-07 remain separately assignable.
+The owner assigned the Rust backend agent WP-01 and then WP-02 on 2026-10-10.
+The [application](../README.md), [WP-01 report](agents/reports/WP-01.md) and
+[WP-02 report](agents/reports/WP-02.md) cover the foundation, local accounts,
+authentication/CSRF, route protection, input limits and destination policy with
+Windows/Fedora evidence. This intermediate build is not a deployable monitoring
+release; WP-03 through WP-07 remain separately assignable.
 
 ## Reading order
 
@@ -54,3 +59,5 @@ Probe scope, Telegram, expected scale, and existing infrastructure are confirmed
 | 2026-10-10 | Owner-requested Hyper/rustls probe resolves D-15 on Windows/Fedora. Narrow one-group Linux ping proven in an isolated namespace without changing host policy. WP-00 feasibility complete; later packages unstarted. |
 | 2026-10-10 | Owner assigned WP-01; backend foundation completed with 18 Windows/19 Fedora tests, release lifecycle checks and dependency/license review. Later packages and production changes remain unstarted. |
 | 2026-10-10 | Owner review follow-up adds bounded WAL reclamation and a real pressure/recovery integration test without restart; deployment uses the shared persistent state lock. Final checks pass 19 Windows/20 Fedora tests. WP-02 remains unstarted. |
+| 2026-10-10 | Owner assigned WP-02 backend security. Account/session/CSRF, protected routes, request/hash limits, proxy identity and destination policy implemented; 32 Windows/33 Fedora tests, release lifecycle, Linux interactive commands and short capped exercise pass. Later packages remain unstarted. |
+| 2026-10-10 | WP-02 owner review hard-denies AWS IPv6 metadata before grants; regression and full checks pass with 33 Windows/34 Fedora tests. Eight remains the monitoring DNS limit; the 32-address policy-helper ceiling is separate. WP-03 incident overflow remains a prerequisite, and WP-03 is unstarted. |

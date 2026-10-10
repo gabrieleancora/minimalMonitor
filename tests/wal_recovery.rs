@@ -1,4 +1,9 @@
-use minimalmonitor::{bounds::WAL_BYTES, ownership::StateOwner, storage::Storage};
+use minimalmonitor::{
+    bounds::WAL_BYTES,
+    error::Error,
+    ownership::StateOwner,
+    storage::{Storage, security::Operation},
+};
 use rusqlite::Connection;
 
 #[tokio::test]
@@ -12,7 +17,7 @@ async fn pinned_wal_pressure_recovers_on_the_same_worker_without_restart() {
     assert!(client.health().await.unwrap().writable);
 
     // Controlled, bounded fixture connections stand in for a long read and
-    // committed writes. No feature mutation API exists in WP-01 yet.
+    // committed writes. WP-02 account mutations use the real worker admission.
     let path = root.join("monitor.db");
     let reader = tokio::task::spawn_blocking(move || {
         let writer = Connection::open(&path).unwrap();
@@ -58,6 +63,17 @@ async fn pinned_wal_pressure_recovers_on_the_same_worker_without_restart() {
         let health = client.health().await.unwrap();
         assert!(!health.writable);
         assert!(health.disk_warning);
+        assert!(matches!(
+            client
+                .security(Operation::Local {
+                    user: "fixture".into(),
+                    hash: "noncredential-fixture".into(),
+                    reset: false,
+                    now: minimalmonitor::auth::now_ms().unwrap()
+                })
+                .await,
+            Err(Error::DiskPressure)
+        ));
     }
     assert!(
         std::fs::metadata(root.join("monitor.db-wal"))
@@ -86,6 +102,15 @@ async fn pinned_wal_pressure_recovers_on_the_same_worker_without_restart() {
 
     // No Storage restart or connection replacement: this same client recovers.
     assert!(client.health().await.unwrap().writable);
+    client
+        .security(Operation::Local {
+            user: "fixture".into(),
+            hash: "noncredential-fixture".into(),
+            reset: false,
+            now: minimalmonitor::auth::now_ms().unwrap(),
+        })
+        .await
+        .unwrap();
     assert!(
         std::fs::metadata(root.join("monitor.db-wal"))
             .unwrap()

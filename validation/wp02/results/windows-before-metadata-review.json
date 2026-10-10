@@ -1,0 +1,26 @@
+{
+  "package": "WP-02",
+  "checks": {
+    "fmt": "0",
+    "clippy": "0",
+    "test": "0",
+    "release": "0",
+    "version": "0",
+    "lifecycle": "0"
+  },
+  "passed_tests": 32,
+  "unit_tests": 29,
+  "integration_tests": 3,
+  "lifecycle": {
+    "platform": "win32",
+    "passed": true,
+    "seconds": 3.282,
+    "binary_bytes": 2336768,
+    "binary_sha256": "6e798ddb5112c8011d0a60918b35c3acf712672838015134a80eb37fd35e9554",
+    "state_bytes": 126976,
+    "linux_sigterm": false,
+    "windows_forced_exit": true
+  },
+  "compiler": "1.98.1",
+  "target": "x86_64-pc-windows-msvc"
+}

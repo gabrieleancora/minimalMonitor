@@ -6,6 +6,14 @@ rust-version = "1.98"
 publish = false
 
 [dependencies]
+argon2 = { version = "=0.5.3", default-features = false, features = ["alloc", "password-hash"] }
+getrandom = "=0.4.3"
+hmac = "=0.12.1"
+ipnet = "=2.11.0"
+rpassword = "=7.5.4"
+sha2 = "=0.10.9"
+subtle = "=2.6.1"
+zeroize = { version = "=1.8.2", features = ["serde"] }
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio", "json"] }
 fs2 = "=0.4.3"
 hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }

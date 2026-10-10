@@ -1,8 +1,9 @@
 # Architecture and resource envelope
 
-Status: proposed implementation architecture. Resource numbers are targets to prove.
+Status: WP-01 foundation and WP-02 security implementation baseline; later
+components remain planned. Resource numbers are targets to prove.
 
-WP-01 implements the [backend foundation](../../README.md), using the versions recorded in D-16 and its [report](../agents/reports/WP-01.md). Worker capacities below remain intact. The foundation server uses at most 16 active HTTP/1 connections (including parsing and writes), 16 KiB parser/header budget, a five-second connection deadline and one request per connection; overload closes excess sockets. Two async workers and at most two blocking helpers accompany one dedicated SQLite thread. Shared nonwaiting semaphores reserve four probe slots, one hash and one notification sender; feature workers are not yet implemented. Keep bounded connection admission when extending the server in later packages.
+WP-01 implements the [backend foundation](../../README.md), using the versions recorded in D-16 and its [report](../agents/reports/WP-01.md). Worker capacities below remain intact. The foundation server uses at most 16 active HTTP/1 connections (including parsing and writes), 16 KiB parser/header budget, a five-second connection deadline and one request per connection; overload closes excess sockets. Two async workers and at most two blocking helpers accompany one dedicated SQLite thread. Shared nonwaiting semaphores reserve four probe slots, one hash and one notification sender; WP-02 uses the hash slot while probe/sender workers remain future packages. Keep bounded connection admission when extending the server in later packages.
 
 ## System boundaries
 
@@ -37,6 +38,17 @@ These choices are proposals, not selected version numbers. Pin compatible versio
 WP-00's isolated Windows and Fedora prototypes support basic stack feasibility, not production qualification. The owner-authorized Hyper follow-up resolves D-15 with measured parser-limit tests on both platforms, verified TLS and short capped Linux release execution. Non-root v4/v6 echo was additionally proven with a one-group permission and zero capabilities in a disposable namespace. The feasibility gate is complete; later application security/retention/soak and production distribution tests remain required. See [the evidence report](../agents/reports/WP-00.md) and [available Linux development environment](../operations/linux-development.md).
 
 ## Runtime separation
+
+WP-02 adds one admitted blocking Argon2 task, retaining its permit through
+cancellation. Login and password change share the global hash-start limiter;
+no waiting hash queue is introduced. Signed preauth is stateless, session rows
+remain capped at five and the expiring login IP map at 2048. Destination policy
+contains at most 64 grants, with at most 64 ports each; validated answer sets
+contain at most 32 supplied addresses as a defensive library ceiling; monitoring
+transports retain the stricter eight-answer limit and reject oversized whole
+resolutions before calling the policy. Account/session commands reuse the database
+worker's channel and worker-side write admission. Existing connection/body/header
+deadlines remain intact; credential JSON has a stricter 1024-byte limit.
 
 - Scheduler owns due times and bounded monitor state; four total probe slots, at most one active probe per monitor.
 - Start with two Tokio runtime workers. Database work runs on one dedicated thread with one connection and a bounded command channel (128 commands). Short queries and batched retention avoid blocking probe result persistence for long periods.

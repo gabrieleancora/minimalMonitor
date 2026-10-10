@@ -32,7 +32,7 @@ static REQUEST_ID: AtomicU64 = AtomicU64::new(1);
 pub const REQUEST_TIME: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Copy)]
-struct Peer(SocketAddr);
+pub(crate) struct Peer(pub(crate) SocketAddr);
 
 #[derive(Serialize)]
 struct ErrorEnvelope {
@@ -49,7 +49,7 @@ struct HealthBody {
     status: &'static str,
 }
 
-fn failure(status: StatusCode, code: &'static str) -> Response {
+pub(crate) fn failure(status: StatusCode, code: &'static str) -> Response {
     (
         status,
         Json(ErrorEnvelope {
@@ -63,19 +63,19 @@ fn failure(status: StatusCode, code: &'static str) -> Response {
         .into_response()
 }
 
-fn router(storage: StorageClient) -> Router {
+pub(crate) fn health_router(storage: StorageClient) -> Router {
     Router::new()
         .route(
             "/health/live",
             get(|| async { Json(HealthBody { status: "live" }) }),
         )
         .route("/health/ready", get(ready))
-        .fallback(|| async { failure(StatusCode::NOT_FOUND, "not_found") })
-        .method_not_allowed_fallback(|| async {
-            failure(StatusCode::METHOD_NOT_ALLOWED, "method_not_allowed")
-        })
         .with_state(storage)
-        .layer(DefaultBodyLimit::max(BODY_BYTES))
+}
+#[cfg(test)]
+fn router(storage: StorageClient) -> Router {
+    health_router(storage)
+        .fallback(|| async { failure(StatusCode::NOT_FOUND, "not_found") })
         .layer(middleware::from_fn(boundary))
 }
 
@@ -87,7 +87,7 @@ async fn ready(State(storage): State<StorageClient>) -> Response {
     }
 }
 
-async fn boundary(request: Request, next: Next) -> Response {
+pub(crate) async fn boundary(request: Request, next: Next) -> Response {
     // Uses the accepted socket identity. Never reads X-Forwarded-For or Host as
     // an authorization signal. Nginx must exclude both health paths publicly.
     let local = request
@@ -101,17 +101,29 @@ async fn boundary(request: Request, next: Next) -> Response {
         .and_then(|value| value.parse::<u64>().ok());
     let mut response = if !local {
         failure(StatusCode::FORBIDDEN, "local_only")
-    } else if request.uri().to_string().len() > 2048 {
+    } else if request.uri().to_string().len() > 2048 || request.uri().authority().is_some() {
         failure(StatusCode::BAD_REQUEST, "invalid_request")
     } else if length.is_some_and(|length| length > BODY_BYTES as u64) {
         failure(StatusCode::PAYLOAD_TOO_LARGE, "body_too_large")
-    } else if length.is_some_and(|length| length != 0)
-        || request.headers().contains_key(header::TRANSFER_ENCODING)
-        || request.uri().query().is_some()
+    } else if request.uri().path().starts_with("/health/")
+        && (length.is_some_and(|length| length != 0)
+            || request.headers().contains_key(header::TRANSFER_ENCODING)
+            || request.uri().query().is_some())
     {
         failure(StatusCode::BAD_REQUEST, "invalid_request")
     } else {
-        match tokio::time::timeout(REQUEST_TIME, next.run(request)).await {
+        match tokio::time::timeout(REQUEST_TIME, async {
+            let (parts, body) = request.into_parts();
+            match axum::body::to_bytes(body, BODY_BYTES).await {
+                Ok(bytes) => {
+                    next.run(Request::from_parts(parts, axum::body::Body::from(bytes)))
+                        .await
+                }
+                Err(_) => failure(StatusCode::PAYLOAD_TOO_LARGE, "body_too_large"),
+            }
+        })
+        .await
+        {
             Ok(response) => response,
             Err(_) => failure(StatusCode::SERVICE_UNAVAILABLE, Error::Deadline.code()),
         }
@@ -128,7 +140,7 @@ async fn boundary(request: Request, next: Next) -> Response {
     );
     headers.insert(
         header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static("default-src 'none'; frame-ancestors 'none'; base-uri 'none'"),
+        HeaderValue::from_static("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'"),
     );
     response
 }
@@ -138,10 +150,22 @@ async fn boundary(request: Request, next: Next) -> Response {
 /// tasks or application connection queue. Later private routes reuse this server.
 pub async fn serve(
     listener: TcpListener,
-    storage: StorageClient,
+    auth: crate::auth::Auth,
+    origin: &url::Url,
+    mode: crate::config::Mode,
+    trusted_proxy: Option<std::net::IpAddr>,
     shutdown: impl Future<Output = ()>,
 ) -> Result<()> {
-    let routes = router(storage);
+    let routes = crate::web_security::router(auth, origin, mode, trusted_proxy)
+        .layer(DefaultBodyLimit::max(BODY_BYTES))
+        .layer(middleware::from_fn(boundary));
+    serve_routes(listener, routes, shutdown).await
+}
+async fn serve_routes(
+    listener: TcpListener,
+    routes: Router,
+    shutdown: impl Future<Output = ()>,
+) -> Result<()> {
     let slots = Arc::new(Semaphore::new(WEB_CONNECTIONS));
     let mut tasks = JoinSet::new();
     tokio::pin!(shutdown);
@@ -257,7 +281,7 @@ mod tests {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let (stop, shutdown) = tokio::sync::oneshot::channel();
-        let server = tokio::spawn(serve(listener, storage.client(), async {
+        let server = tokio::spawn(serve_routes(listener, router(storage.client()), async {
             let _ = shutdown.await;
         }));
         let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();

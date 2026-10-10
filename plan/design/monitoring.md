@@ -30,6 +30,15 @@ Ping: send one fixed, small ICMP echo payload per selected destination attempt; 
 
 For all protocols, DNS answers and connection attempts pass the outbound policy. Cap accepted DNS addresses at eight and reject oversized answer sets. Auto mode may try up to two validated addresses sequentially, splitting the remaining deadline, with success if either meets the check contract. No second unchecked DNS lookup. Latency is end-to-end monotonic elapsed time, including DNS and fallback; it is not represented as pure ICMP round-trip time. Store individual error categories without remote response bodies.
 
+The eight-answer transport limit remains authoritative for HTTP/HTTPS, TCP and
+ping. WP-02's shared policy helper has a separate defensive capacity of 32
+supplied addresses; that ceiling does not increase the monitor's DNS allowance.
+WP-03 must reject the whole resolution if it contains more than eight answers,
+without truncating or filtering before policy evaluation. Validate every accepted
+answer before address-family/fallback selection; a denied ninth answer cannot
+be hidden by keeping the first eight. No resolver/transport is implemented by
+this WP-02 clarification. See the [security contract](../operations/security.md#outbound-destination-policy).
+
 ## Scheduling
 
 Spread initial due times across one interval using bounded jitter; then use monotonic due times. Each interval has at most one scheduled result. Never overlap checks, build an unbounded queue, retry immediately on failure, or replay missed checks after downtime. Expired slots are unknown coverage. Persist enough schedule/configuration epochs to reconstruct expected slots across restarts. Wall-clock jumps must create an explicit coverage discontinuity and re-anchor the schedule, without duplicate slots.
