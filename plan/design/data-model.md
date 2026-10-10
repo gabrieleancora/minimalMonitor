@@ -1,6 +1,6 @@
 # Data model and persistence
 
-Logical schema only. Implementation agents produce migrations later; no executable schema is included here. Use UTC timestamps, monotonic clocks for in-process elapsed time, parameterized SQL, explicit constraints and versioned migrations.
+This document remains the logical contract. WP-01 adds [foundation migration 1](../../migrations/0001_foundation.sql) outside `plan`; its [report](../agents/reports/WP-01.md) records executable schema and migration evidence. Feature mutation, retention, aggregation and notification behavior remains WP-02 through WP-04 work. Use UTC timestamps, monotonic clocks for in-process elapsed time, parameterized SQL, explicit constraints and versioned migrations.
 
 ## Entities
 
@@ -33,6 +33,8 @@ Proposed settings: foreign keys on, WAL mode, synchronous FULL initially, 2 MiB 
 
 WAL needs checkpoints, and long read transactions can prevent recycling; keep transactions short. Use the normal automatic checkpoint mechanism initially, plus observed maintenance checkpoints. A 32 MiB WAL allowance is a pressure threshold, not a promised hard cap. Configure recycling limits, stop new history writes before further growth threatens reserved headroom, and surface degraded health if checkpoint progress stalls. Never remove a live WAL file manually. These choices are informed by [SQLite WAL documentation](https://www.sqlite.org/wal.html).
 
+WP-01 maintenance first checkpoints PASSIVE. If the allocated WAL remains at least 32 MiB, it makes one SQLite TRUNCATE checkpoint attempt with lock waiting disabled, within the existing command deadline, then restores the ordinary busy timeout. It remeasures database/WAL/free-space/directory sizes before admitting writes. Pinned readers/writers keep admission blocked; a later maintenance/readiness check retries after they finish, without restarting. PASSIVE completion alone does not reclaim allocated bytes; successful TRUNCATE does, as described in [SQLite checkpoint modes](https://www.sqlite.org/pragma.html#pragma_wal_checkpoint). No retry loop or manual WAL deletion is allowed.
+
 ## Retention and size limits
 
 | Data | Proposed retention / bound |
@@ -56,5 +58,7 @@ Check both the application's incremental disk accounting and filesystem free spa
 ## Migrations and backups
 
 Only the active process migrates at startup before scheduling or serving authenticated data. A failed migration leaves the service unready. Preflight free space and a recoverable backup; never attempt a migration that may exceed the 2 GiB budget.
+
+WP-01 implements transactional migration/version records, application identity and newer/inconsistent-schema rejection before binding. An empty initial database needs no preexisting-data snapshot. Future upgrades require a supported SQLite snapshot at `pre-migration.db`; an existing recovery point blocks replacement until operator review. Preflight reserves worst-case main/WAL growth, the snapshot and the architecture's binary/log/headroom allocations. SQLite defensive mode is enabled, values/rows are limited to 1 MiB, SQL to 64 KiB, columns and bind variables to 128, and attached databases to zero. These ceilings supplement field/row/query bounds; they do not establish complete resource qualification. The worker exposes write-admission health; later mutations must check it within the worker before writing. Foundation schema creation does not resolve the confirmed 180-day incident overflow question.
 
 A live backup must use SQLite's supported snapshot/backup mechanism, not copy only the `.db` while it is changing. Use the [SQLite online backup API](https://www.sqlite.org/backup.html) incrementally and verify completion. Local staging holds at most one backup; prefer transfer to existing external storage. Restore verification and version rollback are defined in the deployment plan.

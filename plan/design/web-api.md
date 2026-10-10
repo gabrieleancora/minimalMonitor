@@ -2,6 +2,8 @@
 
 Route names are proposed contracts for frontend/backend coordination. Version the JSON API as `/api/v1`; server-rendered pages may call it through small JavaScript modules. All monitoring data is private.
 
+WP-01's intermediate foundation serves only the two local health routes below. Other routes return a bounded 404 error and expose no monitoring information. This does not replace the authentication/API work assigned to WP-02/WP-05. Liveness and readiness use the accepted socket peer, never forwarded headers. Nginx must exclude the health routes because the proxy itself connects locally. Readiness currently means a fresh database-worker response and write admission; later packages must extend it for their implemented workers without treating target or Telegram failures as process failure.
+
 ## Pages and operations
 
 | Route / operation | Authentication | Contract |

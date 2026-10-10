@@ -26,8 +26,10 @@ Before deployment, collect Linux distribution/version, systemd version, CPU, fre
 | Nonsecret operator configuration | `/etc/minimalmonitor/config.toml`; root-managed, service-readable |
 | Telegram token | `/etc/minimalmonitor/secrets/telegram-token`; owner-only or restricted service-group read |
 | SQLite and state | `/var/lib/minimalmonitor/`; service writable, private |
-| Runtime lock | `/run/minimalmonitor/`; managed at service start |
+| Persistent ownership lock | `/var/lib/minimalmonitor/owner.lock` inside the configured `state_dir`; private, never unlinked |
 | Logs | Journal or dedicated rotated output; choose one primary sink |
+
+The service and every local database command, including bootstrap/reset and offline migration/restore, must acquire the same exclusive OS lock at `state_dir/owner.lock` and retain it through database close. Stop the service before local commands. Preserve the lock file and state directory during restore; replacing/unlinking the lock could create a second lock inode. Do not use a separate runtime-directory lock or remove the persistent lock at startup/shutdown.
 
 The future configuration reference must document listen address, public origin, state path, target policy, trust roots, secret-file path, retention and all limits. Invalid production settings fail startup with safe diagnostics. A Windows development profile can use local paths and loopback HTTP, but insecure cookies/bind settings must not leak into production mode.
 

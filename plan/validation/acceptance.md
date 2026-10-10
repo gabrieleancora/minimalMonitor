@@ -18,6 +18,19 @@ The [WP-00 report](../agents/reports/WP-00.md) records passing Windows/Fedora fe
 | V-10 | R-07, R-12 | Dedicated Nginx integration/TLS/limits, loopback-only backend, private health routes, existing-site regression checks, WireGuard reachability, non-root ping |
 | V-11 | R-11 | Telegram test/down/recovery; digest, ordering, 429 retry-after, 5xx/network retry, permanent failure, restart, expired events, full outbox and possible duplicate handling |
 
+## WP-01 foundation evidence
+
+The [WP-01 report](../agents/reports/WP-01.md) records passing scoped evidence for V-01 and the foundation portions of V-04/V-06/V-08/V-09/V-10. Complete release gates above remain outstanding. This owner-assigned intermediate package requires:
+
+- Windows and real x86_64 Linux fmt, warning-denied clippy, tests, release build and release execution with exact compiler/libc/dependency versions recorded.
+- Strict bounded configuration parsing; reject nonloopback binds, insecure production origins, credentials in origins, invalid fields and oversized files. Configuration validation alone must not create state.
+- Cross-process ownership rejection, lock release after termination, crash/restart integrity, migration idempotency and preserved configuration. Linux graceful SIGTERM and private permissions; distinguish Windows forced termination from graceful console/service testing.
+- Migration failure rolls back DDL/data/version; reject newer/foreign/inconsistent schema before opening the listener. Verify foreign keys, singletons, session/monitor caps, duplicate-slot rejection and SQLite-full rollback. Verify supported snapshot consistency/refusal to overwrite, page-size-based 512 MiB ceiling and conservative migration/backup/disk preflight.
+- Nonwaiting database/shared-work admission, queue saturation, expired commands, cancellation/drop cleanup and independent SQL progress cancellation. Test low-space/WAL/checkpoint admission without claiming real retained-history or filesystem-exhaustion qualification. A real SQLite WAL integration case must cross 32 MiB with a pinned reader, remain blocked through bounded maintenance attempts, preserve the reader's snapshot and committed data, then reclaim the WAL and resume admission on the same worker/client after reader release without restart.
+- Local-only health, spoofed-header rejection as an identity source, bounded safe errors, absence of private routes, oversized-header rejection and slow-client close. Feature routes added later still require V-03/V-06 authentication and security evidence.
+
+Repeatable runners and retained summary evidence live under [validation/wp01](../../validation/wp01/README.md). These cases clarify the package gate; they do not relax the full release acceptance criteria or the 256 MiB/2 GiB budgets.
+
 ## Concrete behavioral cases
 
 - Reject HTTP/1 wire response header blocks exceeding 32 KiB through an enforced parser limit; accept the exact boundary and exercise single, cumulative, fragmented, unterminated and excess-count headers over HTTP/HTTPS. WP-00's Hyper tests pass this scoped feasibility case (D-15). The retained test-only reqwest characterization still reproduces the old gap and is not production probe acceptance evidence.

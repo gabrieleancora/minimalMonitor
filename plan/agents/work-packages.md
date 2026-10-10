@@ -1,6 +1,6 @@
 # Assignable work packages
 
-WP-00 was assigned by the owner on 2026-10-06, retested on Fedora on 2026-10-09, and completed through the owner-authorized Hyper follow-up on 2026-10-10. Its [report](reports/WP-00.md) records passing Windows/Linux feasibility, bounded HTTP parsing, narrowly authorized non-root Linux ping and capped footprint evidence. WP-01 may be separately assigned; WP-01 through WP-07 remain unassigned and not started. The owner selects an agent and gives the relevant package ID. This is an ordered implementation plan, not authorization to start a subsequent package.
+WP-00 was assigned by the owner on 2026-10-06, retested on Fedora on 2026-10-09, and completed through the owner-authorized Hyper follow-up on 2026-10-10. Its [report](reports/WP-00.md) records passing Windows/Linux feasibility, bounded HTTP parsing, narrowly authorized non-root Linux ping and capped footprint evidence. The owner separately assigned the Rust backend agent WP-01 on 2026-10-10; its [report](reports/WP-01.md) records completed foundation scope and Windows/Fedora evidence. WP-02 through WP-07 remain unassigned and not started. The owner selects an agent and gives the relevant package ID. This is an ordered implementation plan, not authorization to start a subsequent package.
 
 | ID | Suggested role | Dependencies | Deliverable / completion gate |
 | --- | --- | --- | --- |

@@ -1,9 +1,11 @@
 # minimalMonitor planning workspace
 
-Status: specification baseline with an isolated WP-00 feasibility prototype; application implementation has not started.
+Status: specification baseline, completed WP-00 feasibility and completed WP-01 backend foundation; later application packages have not started.
 Updated: 2026-10-10.
 
 This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records completed implementation feasibility and remaining application release gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
+
+The owner assigned the Rust backend agent WP-01 on 2026-10-10. The [application foundation](../README.md) and its [WP-01 report](agents/reports/WP-01.md) cover configuration, ownership, bounded workers, schema/migrations, local health and Windows/Fedora validation. This intermediate build is not a deployable monitoring release; WP-02 through WP-07 remain separately assignable.
 
 ## Reading order
 
@@ -50,3 +52,5 @@ Probe scope, Telegram, expected scale, and existing infrastructure are confirmed
 | 2026-10-06 | Owner assigned WP-00. Windows prototype tested; Linux tooling/permission and HTTP header-limit gaps recorded. No subsequent package or production change started. |
 | 2026-10-09 | Owner supplied a separate Fedora development machine. WP-00 Linux checks and capped footprint measured; access/workspace documented for future agents. HTTP header-limit gap remains open. |
 | 2026-10-10 | Owner-requested Hyper/rustls probe resolves D-15 on Windows/Fedora. Narrow one-group Linux ping proven in an isolated namespace without changing host policy. WP-00 feasibility complete; later packages unstarted. |
+| 2026-10-10 | Owner assigned WP-01; backend foundation completed with 18 Windows/19 Fedora tests, release lifecycle checks and dependency/license review. Later packages and production changes remain unstarted. |
+| 2026-10-10 | Owner review follow-up adds bounded WAL reclamation and a real pressure/recovery integration test without restart; deployment uses the shared persistent state lock. Final checks pass 19 Windows/20 Fedora tests. WP-02 remains unstarted. |

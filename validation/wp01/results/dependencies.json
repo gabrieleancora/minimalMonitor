@@ -1,0 +1,18 @@
+{
+  "checked_at_utc": "2026-10-10T10:44:59.147844+00:00",
+  "packages": 99,
+  "findings": [],
+  "license_expressions": [
+    "(MIT OR Apache-2.0) AND Unicode-3.0",
+    "Apache-2.0",
+    "Apache-2.0 OR MIT",
+    "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT",
+    "MIT",
+    "MIT AND BSD-3-Clause",
+    "MIT OR Apache-2.0",
+    "MIT OR Apache-2.0 OR LGPL-2.1-or-later",
+    "MIT/Apache-2.0",
+    "Unicode-3.0",
+    "Unlicense OR MIT"
+  ]
+}

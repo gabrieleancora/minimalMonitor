@@ -1,0 +1,36 @@
+{
+  "validated_on": "2026-10-10",
+  "environment": "Windows x86_64 MSVC; Rust/Cargo 1.98.1",
+  "sqlite": "3.53.2",
+  "toolchain_override": "existing RUSTUP_TOOLCHAIN=stable",
+  "check_exit_codes": {
+    "fmt": 0,
+    "clippy": 0,
+    "test": 0,
+    "release": 0,
+    "version": 0,
+    "lifecycle": 0
+  },
+  "tests": {
+    "passed": 19,
+    "seconds": 6.97,
+    "ignored": 0,
+    "failed": 0,
+    "unit_seconds": 5.1,
+    "wal_integration_seconds": 1.87,
+    "seconds_definition": "Sum of test execution times; excludes Cargo compilation"
+  },
+  "lifecycle": {
+    "platform": "win32",
+    "passed": true,
+    "seconds": 2.672,
+    "binary_bytes": 2065408,
+    "binary_sha256": "49cf253305b584adf95abbdc394f7f207784e39063ed51985f0b38fbd3ea7804",
+    "state_bytes": 126976,
+    "linux_sigterm": false,
+    "windows_forced_exit": true
+  },
+  "resource_qualification": "Not run; fixture file lengths only",
+  "production_baseline": "Not selected or verified",
+  "wal_recovery": "Real WAL above 32 MiB; pinned-reader admission blocked; same-worker recovery after reader release; snapshot, committed revision and integrity verified"
+}

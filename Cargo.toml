@@ -1,0 +1,28 @@
+[package]
+name = "minimalmonitor"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+
+[dependencies]
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "tokio", "json"] }
+fs2 = "=0.4.3"
+hyper = { version = "=1.12.0", default-features = false, features = ["server", "http1"] }
+hyper-util = { version = "=0.1.21", default-features = false, features = ["tokio"] }
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "hooks", "backup", "limits"] }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "=1.53.2", default-features = false, features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal", "io-util"] }
+toml = { version = "=1.1.4", default-features = false, features = ["parse", "serde"] }
+tower = { version = "0.5", default-features = false, features = ["util"] }
+url = "=2.5.8"
+
+[dev-dependencies]
+tempfile = "=3.27.0"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

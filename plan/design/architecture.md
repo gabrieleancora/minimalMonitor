@@ -2,6 +2,8 @@
 
 Status: proposed implementation architecture. Resource numbers are targets to prove.
 
+WP-01 implements the [backend foundation](../../README.md), using the versions recorded in D-16 and its [report](../agents/reports/WP-01.md). Worker capacities below remain intact. The foundation server uses at most 16 active HTTP/1 connections (including parsing and writes), 16 KiB parser/header budget, a five-second connection deadline and one request per connection; overload closes excess sockets. Two async workers and at most two blocking helpers accompany one dedicated SQLite thread. Shared nonwaiting semaphores reserve four probe slots, one hash and one notification sender; feature workers are not yet implemented. Keep bounded connection admission when extending the server in later packages.
+
 ## System boundaries
 
 ```text
@@ -14,6 +16,8 @@ Browser -> existing Nginx (HTTPS) -> loopback Rust HTTP listener
 ```
 
 One active process owns a database. No remote database, distributed scheduler, target-side agent, message broker, or frontend server. Embed release web assets in the binary. Use a local filesystem for SQLite. A process lock prevents accidentally starting two schedulers against the same state directory.
+
+The WP-01 lock is `owner.lock` in the private state directory, retained without unlinking. This lets later stopped-service bootstrap/reset commands acquire the same identity on Windows/Linux; the database worker owns the lock until it closes its connection. Deployment must retain this shared ownership contract even if a runtime-directory reference is added.
 
 ## Candidate stack
 
