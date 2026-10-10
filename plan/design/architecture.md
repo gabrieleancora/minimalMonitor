@@ -20,7 +20,8 @@ One active process owns a database. No remote database, distributed scheduler, t
 | Concern | Proposal | Reason / feasibility requirement |
 | --- | --- | --- |
 | HTTP server | Axum, Tokio, selected Tower middleware | Async I/O and composable bounds; enable only required features |
-| Probe HTTP and Telegram | reqwest with rustls | Verified TLS; separate clients and policies for probes and Telegram |
+| Probe HTTP/HTTPS | Hyper HTTP/1 with rustls | WP-00 validates 32 KiB wire header/parser-buffer limits and 100-header count; verified TLS, one-shot connections, scoped driver and total deadline |
+| Telegram | reqwest with rustls | Separate fixed-origin client/policy, verified TLS and bounded response handling to implement/test in WP-04 |
 | Database | rusqlite with bundled SQLite | Consistent database version across Windows/Linux; dedicated worker avoids blocking async runtime |
 | HTML | Escaping template engine such as Askama | Server-rendered shell, no large SPA framework |
 | Browser | Local CSS, small JavaScript modules, simple SVG charts | No CDN, external fonts, telemetry or browser dependencies at runtime |
@@ -29,7 +30,7 @@ One active process owns a database. No remote database, distributed scheduler, t
 
 These choices are proposals, not selected version numbers. Pin compatible versions and the toolchain during foundation work; audit advisories and licenses at that time. [Axum](https://docs.rs/axum/latest/axum/), [reqwest](https://docs.rs/reqwest/latest/reqwest/), and [rusqlite](https://docs.rs/rusqlite/latest/rusqlite/) provide the candidate capabilities; none demonstrates this application's footprint in advance.
 
-WP-00's isolated Windows prototype supports basic stack feasibility, not production qualification. The reqwest HTTP/1 client does not yet enforce the probe contract's 32 KiB header limit: D-15 calls for a demonstrated bounded transport before adopting the probe client. Linux Rust execution and successful non-root datagram echo remain missing; see [the evidence report](../agents/reports/WP-00.md).
+WP-00's isolated Windows and Fedora prototypes support basic stack feasibility, not production qualification. The owner-authorized Hyper follow-up resolves D-15 with measured parser-limit tests on both platforms, verified TLS and short capped Linux release execution. Non-root v4/v6 echo was additionally proven with a one-group permission and zero capabilities in a disposable namespace. The feasibility gate is complete; later application security/retention/soak and production distribution tests remain required. See [the evidence report](../agents/reports/WP-00.md) and [available Linux development environment](../operations/linux-development.md).
 
 ## Runtime separation
 

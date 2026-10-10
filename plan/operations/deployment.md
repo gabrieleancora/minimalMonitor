@@ -10,8 +10,9 @@ Before deployment, collect Linux distribution/version, systemd version, CPU, fre
 
 ## Development and delivery
 
+- An owner-provided Fedora x86_64 remote development machine is available through `remote-dev`. Use only `/home/gabriele/rust-develop/minimalMonitor` for this project's remote files, caches, builds and evidence. Follow the [Linux development access and workflow](linux-development.md); this machine is separate from production and does not determine the minimum supported production glibc.
 - Develop and run ordinary tests natively on Windows. Isolate OS-specific ping, service lifecycle and filesystem permissions behind small interfaces.
-- Pin stable Rust and dependency versions at implementation time. Build the production release on Linux CI or WSL2 for `x86_64-unknown-linux-gnu`; determine the oldest supported glibc from the owner's distribution. A musl build is optional only after DNS/TLS/ping compatibility tests.
+- Pin stable Rust and dependency versions at implementation time. Build the production release on a compatible Linux builder (CI, the documented remote development machine, or WSL2) for `x86_64-unknown-linux-gnu`; determine the oldest supported glibc from the owner's distribution. The available Fedora builder's glibc 2.43 is not automatically that baseline. A musl build is optional only after DNS/TLS/ping compatibility tests.
 - Test both Windows and the selected Linux baseline. A successful cross-compile alone does not prove Linux runtime behavior. The [Rust platform-support reference](https://doc.rust-lang.org/rustc/platform-support.html) documents target support; actual deployment compatibility still needs verification.
 - Ship a stripped binary containing web assets, checksums, version/build information, dependency/license inventory, operator documentation and later-tested deployment templates. Do not require Rust, Node, compilers, Docker, or a SQLite server on the target.
 - Embed/bundle the intended SQLite library and record its actual runtime version for advisory review. TLS trust roots and custom internal CA configuration must be documented and tested on Linux.

@@ -1,9 +1,9 @@
 # minimalMonitor planning workspace
 
 Status: specification baseline with an isolated WP-00 feasibility prototype; application implementation has not started.
-Updated: 2026-10-06.
+Updated: 2026-10-10.
 
-This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records partial feasibility and remaining gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
+This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records completed implementation feasibility and remaining application release gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
 
 ## Reading order
 
@@ -19,6 +19,7 @@ This directory contains specifications and handoff reports. The isolated [WP-00 
 | [GUI design](design/gui.md) | Uptime Kuma inspired layout, day/night themes, and accessibility |
 | [Security](operations/security.md) | Application, reverse proxy, host, and upstream responsibilities |
 | [Deployment and recovery](operations/deployment.md) | Windows development, Linux delivery, backup, and recovery |
+| [Available Linux development machine](operations/linux-development.md) | Verified SSH access, approved remote folder, Fedora toolchain and repeatable checks |
 | [Acceptance plan](validation/acceptance.md) | Functional, security, compatibility, and resource release gates |
 | [Agent instructions](agents/README.md) | Coding conventions, handoff rules, and role assignments |
 | [Work packages](agents/work-packages.md) | Ordered jobs the owner can assign to agents |
@@ -47,3 +48,5 @@ Probe scope, Telegram, expected scale, and existing infrastructure are confirmed
 | 2026-10-06 | Initial planning package; no application code, runnable deployment files, or agents created. |
 | 2026-10-06 | Owner confirmed ping and Telegram, 10–15 services, existing Nginx/WireGuard, and non-negotiable disk limit. |
 | 2026-10-06 | Owner assigned WP-00. Windows prototype tested; Linux tooling/permission and HTTP header-limit gaps recorded. No subsequent package or production change started. |
+| 2026-10-09 | Owner supplied a separate Fedora development machine. WP-00 Linux checks and capped footprint measured; access/workspace documented for future agents. HTTP header-limit gap remains open. |
+| 2026-10-10 | Owner-requested Hyper/rustls probe resolves D-15 on Windows/Fedora. Narrow one-group Linux ping proven in an isolated namespace without changing host policy. WP-00 feasibility complete; later packages unstarted. |

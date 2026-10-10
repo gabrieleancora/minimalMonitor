@@ -22,7 +22,7 @@ Hard cap: 50 configured monitors including paused ones. Admission for enabled mo
 
 HTTP: send GET and evaluate response headers/status; do not download or store response bodies. No redirect following in version one: a 3xx passes only if explicitly accepted. Disable automatic decompression, cookie persistence, environment proxy inheritance and automatic retries. Cap received headers at 32 KiB; enforce the total deadline across DNS, connection and TLS. Never permit insecure TLS mode. Operator-managed additional trust roots may support private HTTPS certificates.
 
-The header bound must apply while parsing, before accepting an oversized response; checking the final header map alone does not bound parser allocation. WP-00 found the candidate reqwest HTTP/1 configuration accepting 33 KiB. Resolve D-15 with a demonstrably bounded transport without weakening this limit.
+The header bound applies to the complete HTTP/1 wire header block, including the status line and CRLF terminator, and must be enforced during parsing; checking the final header map alone does not bound parser allocation. Set a 32 KiB header-size and connection-buffer strategy limit plus a 100-header count limit. WP-00's Hyper/rustls transport accepts exactly 32 KiB and rejects oversized single, cumulative, fragmented and unterminated blocks on Windows/Fedora (D-15 resolved). Probe HTTP/1 support does not require HTTP/2, connection pooling or body downloads.
 
 TCP: DNS plus connection establishment inside one deadline. Success means a TCP connection was accepted, not that the application protocol worked. Send no payload and close promptly.
 

@@ -1,6 +1,6 @@
 # Decisions and open questions
 
-Updated: 2026-10-06. "Proposed" is a planning baseline, not owner approval or a benchmark result.
+Updated: 2026-10-10. "Proposed" is a planning baseline, not owner approval or a benchmark result.
 
 ## Decision register
 
@@ -11,7 +11,7 @@ Updated: 2026-10-06. "Proposed" is a planning baseline, not owner approval or a 
 | D-03 | Confirmed | Day/night appearance; Uptime Kuma is the GUI reference. |
 | D-04 | Confirmed | Planning agent writes specifications only; owner explicitly calls other agents. |
 | D-05 | Confirmed | One Rust binary with embedded assets, native Linux service, no required container. |
-| D-06 | Confirmed | Axum/Tokio, reqwest with rustls, rusqlite on a dedicated worker, server-rendered HTML and small JavaScript modules. Validate dependency features and actual memory use before committing to this stack. |
+| D-06 | Confirmed baseline; WP-00 refinement | Axum/Tokio, Hyper HTTP/1 with rustls for probes (owner-authorized D-15 experiment), reqwest/rustls proposed for the separate fixed-origin Telegram sender, rusqlite on a dedicated worker, server-rendered HTML and small JavaScript modules. WP-00 validates bounded probe parsing and short Windows/Linux footprint, not full release qualification. |
 | D-07 | Confirmed | HTTP/HTTPS, TCP and ping in the first release. Use unprivileged ICMP where supported; platform feasibility must be demonstrated early. |
 | D-08 | Confirmed | One administrator, local first-user bootstrap, cookie sessions, no public registration. |
 | D-09 | Confirmed scale; proposed limits | Owner expects 10–15 services. Qualify at 15; propose a hard configuration cap of 50 plus scheduler capacity admission. Higher qualified capacity requires new evidence. |
@@ -19,14 +19,22 @@ Updated: 2026-10-06. "Proposed" is a planning baseline, not owner approval or a 
 | D-11 | Confirmed infrastructure; proposed integration | Existing Nginx and WireGuard to the home network. Integrate a dedicated Nginx virtual host and loopback Rust listener; preserve current routing and other sites. |
 | D-12 | Proposed | Budget incremental service resources, extra Nginx overhead, data, logs and backup staging. Keep 256 MiB RAM conservative; disk cannot exceed 2 GiB. Host reports: 874 MiB RAM total, approximately 574 MB in use. |
 | D-13 | Confirmed | Telegram down/recovery alerts plus dashboard incidents in the first release. |
-| D-14 | Proposed | Linux GNU target built/tested in Linux CI or WSL2. Exact distro/glibc baseline is unresolved; do not assume a Windows binary can run on Linux. |
-| D-15 | Observed gap; proposed remedy | WP-00 reproduced reqwest 0.12.28 accepting a 33 KiB HTTP/1 response header; the required 32 KiB probe-contract bound is not satisfied by the candidate client as configured. Use an HTTP probe transport exposing a parser buffer/header limit (for example Hyper with rustls), or an equivalently demonstrated solution. Keep reqwest for fixed-origin Telegram only with its separate response bounds. Do not raise the contract limit to accommodate the library. Resolve and validate before accepting the probe transport; see [WP-00 evidence](agents/reports/WP-00.md). |
+| D-14 | Development environment available; production baseline open | Owner-provided Fedora 44 x86_64 development machine through `remote-dev`, scoped to `/home/gabriele/rust-develop/minimalMonitor`; Rust 1.99.0/GCC/glibc 2.43 tested on 2026-10-09. See [access/workflow](operations/linux-development.md). Exact production distro/minimum glibc remains unresolved; Fedora success does not establish compatibility with older Linux distributions. |
+| D-15 | Resolved by measured WP-00 experiment | Original reqwest 0.12.28 probe accepted 33 KiB headers. Owner requested Hyper: Hyper 1.12.0 HTTP/1 now sets `max_header_size(32768)`, `max_buf_size(32768)` and `max_headers(100)` with verified rustls TLS. Windows/Fedora accept an exact 32 KiB wire header block and reject one byte over, large single/cumulative/fragmented/unterminated blocks and excess header count. The 32 KiB contract was preserved; reqwest is test-only in the prototype and remains proposed for the separate Telegram sender. See [WP-00 evidence](agents/reports/WP-00.md). |
 
 ## WP-00 evidence reconciliation (2026-10-06)
 
 - D-06 remains the candidate stack, with Windows feasibility evidence only; Linux Rust execution and footprint are unverified. WSL Ubuntu 24.04.1/glibc 2.39 is a discovered development environment, not the selected production baseline.
 - D-07 is proven for non-elevated Windows IPv4/IPv6 loopback. The WSL non-root diagnostic found denied datagram ping permission for both families (`ping_group_range=1 0`); no sysctl, privilege or infrastructure changes were made.
 - Corrected the data model's 90-day incident age to confirmed D-10's 180 days. Its proposed 10,000 closed-incident ceiling cannot silently reduce that retention; overflow behavior remains to be resolved before WP-03.
+
+## Fedora evidence update (2026-10-09)
+
+The 2026-10-09 Fedora rerun superseded the earlier lack of Rust/Linux feasibility evidence: 10 Linux tests and release execution passed, including non-root v4/v6 datagram echo; a temporary 128 MiB scope with swap disabled completed successfully. At that point D-15 remained open. The development host's existing ping permission covers all groups and was not changed.
+
+## Hyper evidence update (2026-10-10)
+
+The owner-authorized Hyper prototype closes D-15: 13 Windows and 14 Fedora tests pass with the required parser limits. A disposable Linux user/network namespace also proves v4/v6 echo with only GID 1000 authorized, UID 1000, zero capabilities and no-new-privileges; the host-wide policy was untouched. WP-00's feasibility gate is complete and WP-01 may be separately assigned. Production still needs its own narrow service group, selected distro/glibc baseline and full application qualification. See [the updated report](agents/reports/WP-00.md).
 
 ## Questions awaiting owner input
 

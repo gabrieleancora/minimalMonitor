@@ -1,6 +1,6 @@
 # Acceptance and release evidence
 
-The [WP-00 report](../agents/reports/WP-00.md) records partial Windows feasibility checks and a read-only Linux permission diagnostic; none of the complete release gates below has passed. Future agents record commands, environment, observed results and artifacts in their work-package reports. A release needs passing applicable gates, not statements that tests should pass.
+The [WP-00 report](../agents/reports/WP-00.md) records passing Windows/Fedora feasibility checks, measured Hyper header bounds (D-15 resolved), non-root Linux v4/v6 echo under a one-group permission with zero capabilities, and a short Linux capped-memory experiment. WP-00's feasibility gate is complete; none of the complete application release gates below has passed. Future agents can use the [available Linux development machine](../operations/linux-development.md) within their assigned scope. Record commands, environment, observed results and artifacts in work-package reports. A release needs passing applicable gates, not statements that tests should pass.
 
 ## Functional and security gates
 
@@ -20,7 +20,7 @@ The [WP-00 report](../agents/reports/WP-00.md) records partial Windows feasibili
 
 ## Concrete behavioral cases
 
-- Reject HTTP response headers exceeding 32 KiB through an enforced parser limit; exercise large single and cumulative headers. WP-00's characterization test reproduces a candidate-client gap and does not pass this acceptance case (D-15).
+- Reject HTTP/1 wire response header blocks exceeding 32 KiB through an enforced parser limit; accept the exact boundary and exercise single, cumulative, fragmented, unterminated and excess-count headers over HTTP/HTTPS. WP-00's Hyper tests pass this scoped feasibility case (D-15). The retained test-only reqwest characterization still reproduces the old gap and is not production probe acceptance evidence.
 - Retain incidents for confirmed D-10's 180-day window. Resolve bounded overflow behavior before WP-03; a proposed row ceiling cannot silently substitute 90-day or shorter retention.
 - Success, failure, failure, failure opens exactly one incident at the third failure; next success closes it. Raw sample-based availability for that sequence is 2/5 = 40%, regardless of incident threshold.
 - Four completed results in five expected enabled slots, three successful, show 75% availability and 80% coverage. With no completed result, availability is N/A; with no enabled slot, coverage is N/A.

@@ -134,7 +134,9 @@ mod platform {
 
     fn checksum(bytes: &[u8]) -> u16 {
         let mut sum = bytes
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|b| u16::from_be_bytes([b[0], b[1]]) as u32)
             .sum::<u32>();
         while sum >> 16 != 0 {

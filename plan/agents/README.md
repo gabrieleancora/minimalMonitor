@@ -12,6 +12,8 @@ The owner explicitly calls agents. This document defines roles and assignments; 
 6. Supply acceptance evidence appropriate to the assignment. Never claim production performance from a development machine alone.
 7. Write `plan/agents/reports/<package-id>.md` with completed scope, files, test evidence, resource/security implications, deviations, unresolved issues and the next handoff.
 
+For authorized Linux implementation/testing, an owner-provided Fedora machine is available. Read [Linux development access and workflow](../operations/linux-development.md) and use only its approved project root. Do not fall back to claiming Linux testing is unavailable without checking this documented machine's current access and tools.
+
 ## Roles
 
 | Role | Ownership | Important boundary |

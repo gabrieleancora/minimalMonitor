@@ -8,17 +8,21 @@ use tokio::{
 };
 use tokio_rustls::{
     TlsAcceptor,
-    rustls::{self, pki_types::PrivatePkcs8KeyDer},
+    rustls::{
+        self,
+        pki_types::{CertificateDer, PrivatePkcs8KeyDer},
+    },
 };
 
 use crate::Result;
+use crate::probe_http::ProbeClient;
 
 const DEADLINE: Duration = Duration::from_secs(5);
 
 pub struct Fixtures {
     http: SocketAddr,
     tls: SocketAddr,
-    certificate: reqwest::Certificate,
+    certificate: CertificateDer<'static>,
     tasks: Vec<JoinHandle<()>>,
 }
 
@@ -35,7 +39,7 @@ impl Fixtures {
             .expect("local fixture server");
         });
         let key = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
-        let certificate = reqwest::Certificate::from_der(key.cert.der())?;
+        let certificate = key.cert.der().clone();
         let config = rustls::ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(
@@ -86,10 +90,11 @@ impl Fixtures {
 }
 
 pub struct Clients {
-    pub trusted: reqwest::Client,
-    untrusted: reqwest::Client,
+    pub trusted: ProbeClient,
+    untrusted: ProbeClient,
 }
 
+#[cfg(test)]
 fn builder(address: SocketAddr) -> reqwest::ClientBuilder {
     reqwest::Client::builder()
         .no_proxy()
@@ -105,35 +110,37 @@ fn builder(address: SocketAddr) -> reqwest::ClientBuilder {
 impl Clients {
     pub fn new(fixtures: &Fixtures) -> Result<Self> {
         Ok(Self {
-            trusted: builder(fixtures.tls)
-                .add_root_certificate(fixtures.certificate.clone())
-                .build()?,
-            untrusted: builder(fixtures.tls).build()?,
+            trusted: ProbeClient::new(Some(fixtures.certificate.clone()))?,
+            untrusted: ProbeClient::new(None)?,
         })
     }
 
     pub async fn verify_tls(&self, fixtures: &Fixtures) -> Result<()> {
         // Fixed fixture destinations are explicit narrow loopback exceptions. No
         // user URL/DNS input exists; do not expose these clients as production probes.
-        let url = format!("https://localhost:{}/", fixtures.tls.port());
-        assert_eq!(self.trusted.get(&url).send().await?.status(), 200);
-        let untrusted = self.untrusted.get(&url).send().await.unwrap_err();
-        assert!(untrusted.is_connect() && !untrusted.is_timeout());
-        let wrong_host = self
-            .trusted
-            .get(format!("https://{}/", fixtures.tls))
-            .send()
+        assert_eq!(
+            self.trusted.status(fixtures.tls, Some("localhost")).await?,
+            200
+        );
+        let untrusted = self
+            .untrusted
+            .status(fixtures.tls, Some("localhost"))
             .await
             .unwrap_err();
-        assert!(wrong_host.is_connect() && !wrong_host.is_timeout());
+        assert!(untrusted.downcast_ref::<std::io::Error>().is_some());
+        let wrong_host = self
+            .trusted
+            .status(fixtures.tls, Some("127.0.0.1"))
+            .await
+            .unwrap_err();
+        assert!(wrong_host.downcast_ref::<std::io::Error>().is_some());
         Ok(())
     }
 }
 
-pub async fn http_probe(client: &reqwest::Client, address: SocketAddr) -> Result<()> {
+pub async fn http_probe(client: &ProbeClient, address: SocketAddr) -> Result<()> {
     assert!(address.ip().is_loopback());
-    let response = client.get(format!("http://{address}/")).send().await?;
-    assert_eq!(response.status(), 200);
+    assert_eq!(client.status(address, None).await?, 200);
     // Only response status/headers are observed; body is dropped unread.
     Ok(())
 }
@@ -177,15 +184,13 @@ mod tests {
             let _stream = stream;
             tokio::time::sleep(Duration::from_secs(10)).await;
         });
-        let client = builder(address)
-            .timeout(Duration::from_millis(100))
-            .build()?;
-        let error = client
-            .get(format!("http://{address}/"))
-            .send()
-            .await
-            .unwrap_err();
-        assert!(error.is_timeout());
+        let client = ProbeClient::new(None)?.with_deadline(Duration::from_millis(100));
+        let error = client.status(address, None).await.unwrap_err();
+        assert!(
+            error
+                .downcast_ref::<tokio::time::error::Elapsed>()
+                .is_some()
+        );
         server.abort();
         let _ = server.await;
         Ok(())

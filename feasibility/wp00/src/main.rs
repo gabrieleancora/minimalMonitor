@@ -1,5 +1,6 @@
 mod hashing;
 mod ping;
+mod probe_http;
 mod storage;
 mod transport;
 
@@ -18,6 +19,11 @@ async fn main() -> Result<()> {
     db.exercise().await?;
     let fixtures = transport::Fixtures::start().await?;
     let clients = transport::Clients::new(&fixtures)?;
+    println!(
+        "http_transport=hyper_http1,header_bytes={},header_count={}",
+        probe_http::HEADER_BYTES,
+        probe_http::HEADER_COUNT
+    );
     clients.verify_tls(&fixtures).await?;
     println!("tls=trusted_accept,untrusted_reject,wrong_hostname_reject");
     for address in ["127.0.0.1", "::1"] {

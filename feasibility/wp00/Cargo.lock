@@ -707,12 +707,16 @@ version = "0.0.0"
 dependencies = [
  "argon2",
  "axum",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
  "rcgen",
  "reqwest",
  "rusqlite",
  "socket2",
  "tokio",
  "tokio-rustls",
+ "webpki-roots",
  "windows-sys 0.61.2",
 ]
 
