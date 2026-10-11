@@ -67,8 +67,9 @@ The existing ping range allows every group. It was not changed for WP-00 and
 must not be copied to production; production still requires the narrow reviewed
 service-group policy. The host has swap enabled; the recorded capped experiment
 used `MemorySwapMax=0`. Fedora/glibc 2.43 is a development/test baseline, not the
-selected production minimum. Building here does not prove compatibility with an
-older production glibc; select/build/test that baseline before delivery.
+selected production minimum. Production is now confirmed as Debian 12/glibc 2.36
+(D-14, 2026-10-11); building natively here does not prove that compatibility.
+Build and execute against the production baseline before delivery.
 
 On 2026-10-10, WP-00 also verified IPv4 and IPv6 datagram echo in a temporary
 user/network namespace with `ping_group_range=1000 1000`, UID/GID 1000, all

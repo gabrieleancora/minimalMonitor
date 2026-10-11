@@ -10,7 +10,7 @@ This document remains the logical contract. WP-01 adds [foundation migration 1](
 | `admin` | Single row; normalized username, Argon2id password hash, credential generation, timestamps |
 | `sessions` | Hash of opaque random token, admin ID, CSRF token binding, created/last-used/absolute-expiry times; max five active sessions |
 | `monitors` | ID, name, type, validated target fields, interval/deadline, failure threshold, enabled/alerts flags, address family, revision |
-| `schedule_epochs` | Monitor/revision, anchor, interval, enabled start/end, coverage discontinuities; enough data to reconstruct expected slots |
+| `schedule_epochs` | Monitor/revision, anchor, normal interval, cadence mode/next due slot, enabled start/end, coverage discontinuities; enough data to reconstruct expected normal and confirmation slots |
 | `monitor_state` | One row per monitor: status, failure streak, last due/completed time, last result/error, active incident ID |
 | `probe_results` | Monitor/revision, scheduled slot, observed time, outcome, elapsed milliseconds, status code, bounded error category; unique monitor/revision/slot |
 | `hourly_stats` | Monitor/hour: expected, successful, failed, unknown slot counts; latency sum/count/max; unique monitor/hour |
@@ -39,6 +39,13 @@ by healthy idle maintenance and login. Audit writes retain at most 5000 rows and
 30 days. Failed/denied web requests create no durable audit row or per-request log.
 
 Use one database worker/connection initially. Updating a result, state, hourly counters and any incident/outbox transition is one short transaction. A command rejected because the bounded channel is full produces explicit degradation; never acknowledge unsaved configuration. Periodic housekeeping is chunked (up to 500 rows per transaction) and yields to result writes. All web history reads are paginated or aggregated, never full-history exports.
+
+D-19 requires persisting normal/confirmation cadence and the next expected slot
+with the result that schedules it. WP-03 must adapt the foundation schema through
+a versioned migration if necessary; confirmation checks must not coexist with
+replaced normal slots or be counted twice. Missing observations stay unknown;
+do not extrapolate hypothetical confirmation chains through downtime. The
+[monitoring contract](monitoring.md#scheduling) defines these boundaries.
 
 Proposed settings: foreign keys on, WAL mode, synchronous FULL initially, 2 MiB page-cache target, and a 2-second busy timeout. Benchmark before relaxing durability. Reserve enough deadline budget for reporting database contention. Long queries need cancellation independent of the request timeout.
 

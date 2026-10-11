@@ -26,6 +26,7 @@ release; WP-03 through WP-07 remain separately assignable.
 | [GUI design](design/gui.md) | Uptime Kuma inspired layout, day/night themes, and accessibility |
 | [Security](operations/security.md) | Application, reverse proxy, host, and upstream responsibilities |
 | [Deployment and recovery](operations/deployment.md) | Windows development, Linux delivery, backup, and recovery |
+| [Production environment](operations/production-environment.md) | Owner-confirmed Debian baseline, resource snapshot, network/TLS, channel and backup inputs |
 | [Available Linux development machine](operations/linux-development.md) | Verified SSH access, approved remote folder, Fedora toolchain and repeatable checks |
 | [Acceptance plan](validation/acceptance.md) | Functional, security, compatibility, and resource release gates |
 | [Agent instructions](agents/README.md) | Coding conventions, handoff rules, and role assignments |
@@ -36,9 +37,9 @@ release; WP-03 through WP-07 remain separately assignable.
 
 The proposal is one Rust process with embedded web assets, SQLite, HTTP/HTTPS, TCP and ping checks, Telegram alerts, one administrator, and a Linux service behind the owner's existing Nginx reverse proxy. Browser HTML/CSS and a small amount of JavaScript are allowed; the server is Rust. No Node.js runtime, external database server, or container runtime is required on the monitor host.
 
-The owner expects 10–15 services and already has Nginx and a WireGuard connection to the home network. Qualify against 15 monitors, one check per minute, five-second deadlines, and two open dashboard tabs. Retain a conservative 256 MiB incremental RAM budget; the host has 874 MiB total and approximately 574 MB in use according to htop. The 2 GiB available disk limit is firm. These are design targets, not measured claims.
+The owner expects 10–15 services and already has Nginx and WireGuard to the home network. Qualify at 15 monitors, 60-second normal checks, five-second deadlines, 30-second pending-failure confirmation waits and two dashboard tabs. Production is Debian 12 x86_64/glibc 2.36. The latest snapshot has 873 MiB total RAM and only 147 MiB available, with no swap: preserve the 256 MiB incremental ceiling but verify actual headroom before deployment. The 2 GiB incremental disk limit is firm. Resource targets are not measured qualification.
 
-Probe scope, Telegram, expected scale, and existing infrastructure are confirmed. Single-admin access and retention are confirmed; check intervals remain proposed, and the Linux distribution and private target ranges remain open. Consult [decisions](decisions.md).
+Probe scope, Telegram channel destination, scale, single-admin access, retention, cadence and production platform are confirmed. D-21 authorizes both private ranges for all TCP ports and ping. Remaining work includes concrete service configuration, backup setup and deployment/resource qualification. Consult [decisions](decisions.md) and [production inputs](operations/production-environment.md).
 
 ## Maintaining this plan
 
@@ -62,3 +63,4 @@ Probe scope, Telegram, expected scale, and existing infrastructure are confirmed
 | 2026-10-10 | Owner assigned WP-02 backend security. Account/session/CSRF, protected routes, request/hash limits, proxy identity and destination policy implemented; 32 Windows/33 Fedora tests, release lifecycle, Linux interactive commands and short capped exercise pass. Later packages remain unstarted. |
 | 2026-10-10 | WP-02 owner review hard-denies AWS IPv6 metadata before grants; regression and full checks pass with 33 Windows/34 Fedora tests. Eight remains the monitoring DNS limit; the 32-address policy-helper ceiling is separate. WP-03 incident overflow remains a prerequisite, and WP-03 is unstarted. |
 | 2026-10-11 | Owner removed the proposed incident row-count cap (D-18), preserving 180-day retention and existing disk safeguards. The incident-overflow prerequisite is resolved; WP-03 is ready for a separate owner assignment. |
+| 2026-10-11 | Owner supplied Debian 12/glibc 2.36 and resource evidence, faster confirmation cadence (D-19), topology/TLS/channel/NAS preferences (D-20), and both private ranges with all TCP ports/ping (D-21). Updated WP-03 policy/scheduling/coverage contracts and Debian/resource qualification gates; no implementation or deployment performed. |

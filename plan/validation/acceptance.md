@@ -78,6 +78,24 @@ gates remain unchanged and unqualified by these bounded security tests.
 
 ## Concrete behavioral cases
 
+- D-14 production qualification must execute the release on Debian 12 x86_64
+  with glibc 2.36; Fedora testing does not replace this gate. Record artifact
+  library requirements and production-compatible build environment. Do not
+  compile or install a toolchain on the monitor host.
+- D-21 policy tests must cover all TCP ports via a compact flag on both allowed
+  ranges, ports 1/65535 and invalid 0, ungranted private neighbors, independent
+  ping permission, conflicting flag/list rejection and unconditional metadata
+  denial. This new scope extends the completed WP-02 implementation.
+- D-19 cadence: with five-second failures, a first probe due at t=0 completes at
+  t=5; confirmations start at t=35 and t=70 and finish at t=40 and t=75. Open
+  exactly one incident at t=75. No extra normal check runs at t=60. Without
+  scheduler delay, the next normal check is due at t=130. A success on the first
+  confirmation cancels the second and resumes normal cadence at t=95.
+- Count each confirmation once in availability and expected-slot coverage.
+  Replaced normal slots are not missing; missed confirmations, restart,
+  pause/edit, clock discontinuity and local faults cannot fabricate failures,
+  duplicate slots or replay a confirmation burst. Test the revised admission
+  formula and simultaneous pending checks at the 15-monitor baseline.
 - Reject HTTP/1 wire response header blocks exceeding 32 KiB through an enforced parser limit; accept the exact boundary and exercise single, cumulative, fragmented, unterminated and excess-count headers over HTTP/HTTPS. WP-00's Hyper tests pass this scoped feasibility case (D-15). The retained test-only reqwest characterization still reproduces the old gap and is not production probe acceptance evidence.
 - Retain incidents for confirmed D-10's 180-day window and preserve open incidents. Per D-18 there is no incident row-count cap; crossing 10,000 closed incidents must not itself delete or reject incident records. Verify age-based cleanup and existing disk-pressure safeguards without shortening incident retention.
 - Success, failure, failure, failure opens exactly one incident at the third failure; next success closes it. Raw sample-based availability for that sequence is 2/5 = 40%, regardless of incident threshold.
@@ -92,7 +110,7 @@ gates remain unchanged and unqualified by these bounded security tests.
 
 Use a representative Linux environment capped to the planned service memory, with no reliance on swap. Record CPU model/count, RAM, filesystem, kernel, distribution, proxy version, release flags, trust roots and starting database size. Load generators/target simulators must run outside the measured service budget and never flood real third-party endpoints.
 
-Baseline: 15 monitors (five HTTP/HTTPS, five TCP, five ping), 60-second intervals, five-second deadlines, four probe slots, two visible dashboard tabs polling every 15 seconds, one Telegram destination. Include mixed IPv4/IPv6 where the target environment supports them. Run a 24-hour soak, with representative successful TLS and fault phases. Generate retained-history fixtures to exercise the full retention window without waiting 90 days.
+Baseline: 15 monitors (five HTTP/HTTPS, five TCP, five ping), 60-second normal intervals, five-second deadlines, 30-second confirmation waits below the default three-failure threshold, four probe slots, two visible dashboard tabs polling every 15 seconds, one Telegram channel. Include mixed IPv4/IPv6 where the target environment supports them. Run a 24-hour soak, with representative successful TLS, synchronized pending-failure bursts and timeout phases. Generate retained-history fixtures for seven-day raw, 90-day aggregate and 180-day incident retention.
 
 Measure process RSS, cgroup current/peak including charged cache, allocator growth trend, incremental proxy memory, CPU, scheduler delay, API p95 latency, database/WAL sizes, directory totals, queue depth and dropped/unknown slots. Report at least once per minute and at transitions. Repeated runs are justified only after meaningful changes or unexplained results.
 
@@ -100,6 +118,11 @@ Pass criteria:
 
 - Steady process RSS <= 64 MiB, peak <= 96 MiB including one concurrent password hash; service stays within 128 MiB cgroup maximum with no OOM/restart loop.
 - Total measured incremental memory <= 256 MiB including extra proxy overhead; existing sites remain healthy.
+- Before production deployment, verify complete-app peak plus proxy overhead
+  fits measured normal-load host headroom with an explicit operating margin.
+  The owner's 147 MiB available/no-swap snapshot is below the 256 MiB envelope;
+  passing that envelope alone does not qualify this host. Reconcile measured
+  usage/headroom before enabling the service, preserving other workloads.
 - p95 API response below 300 ms excluding login hashing/probes; p99 scheduling delay <= two seconds at baseline.
 - Proposed average CPU target <= 5% of one declared core during steady baseline; report actual numbers and hardware rather than advertising an unqualified guarantee.
 - Total incremental disk usage <= 2048 MiB during retention, backup staging and a staged upgrade; preflight rejects operations that would exceed it.

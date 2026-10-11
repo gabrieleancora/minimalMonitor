@@ -4,15 +4,15 @@ This document specifies future operator deliverables. It does not install softwa
 
 ## Existing environment and required inputs
 
-Owner reports 874 MiB total RAM, approximately 574 MB used in htop, existing Nginx, and a WireGuard route to the home network. The available disk budget is strictly 2 GiB. Used/free/available RAM reporting differs, so qualify against the conservative incremental 256 MiB envelope rather than treating the arithmetic remainder as guaranteed headroom.
+The [production environment record](production-environment.md) contains owner-supplied Debian 12/glibc 2.36/systemd 252 evidence and integration inputs. The 2026-10-11 snapshot has 873 MiB RAM, only 147 MiB available and no swap; /var/lib and /opt share an ext4 root with 2.9G reported available. Preserve the 256 MiB incremental RAM ceiling and firm 2 GiB disk budget, but remeasure real headroom and complete-app usage before deployment. The ceiling does not establish that the host can spare that much memory.
 
-Before deployment, collect Linux distribution/version, systemd version, CPU, free space on the actual state filesystem, dashboard hostname, certificate arrangement, service port, target CIDRs/ports, DNS path, and backup destination. Inspect only relevant existing Nginx/WireGuard configuration; do not redesign the network. Keep secrets out of handoff reports.
+Dashboard origin is `https://monitor.gabry.win` with existing wildcard TLS. Targets use private endpoints over WireGuard, authorized by D-21; private DNS already resolves and internal HTTPS uses Let's Encrypt certificates for `*.local.gabry.win`. Before deployment, refresh resource measurements and verify Nginx version, certificate coverage/renewal, backend port, DNS path, narrow ping-group permissions, and backup destination/access. Inspect only relevant existing Nginx/WireGuard configuration; do not redesign the network. Keep secrets out of handoff reports.
 
 ## Development and delivery
 
-- An owner-provided Fedora x86_64 remote development machine is available through `remote-dev`. Use only `/home/gabriele/rust-develop/minimalMonitor` for this project's remote files, caches, builds and evidence. Follow the [Linux development access and workflow](linux-development.md); this machine is separate from production and does not determine the minimum supported production glibc.
+- An owner-provided Fedora x86_64 remote development machine is available through `remote-dev`. Use only `/home/gabriele/rust-develop/minimalMonitor` for this project's remote files, caches, builds and evidence. Follow the [Linux development access and workflow](linux-development.md); this machine is separate from the confirmed Debian 12/glibc 2.36 production baseline.
 - Develop and run ordinary tests natively on Windows. Isolate OS-specific ping, service lifecycle and filesystem permissions behind small interfaces.
-- Pin stable Rust and dependency versions at implementation time. Build the production release on a compatible Linux builder (CI, the documented remote development machine, or WSL2) for `x86_64-unknown-linux-gnu`; determine the oldest supported glibc from the owner's distribution. The available Fedora builder's glibc 2.43 is not automatically that baseline. A musl build is optional only after DNS/TLS/ping compatibility tests.
+- Pin stable Rust and dependency versions at implementation time. Build the production release for `x86_64-unknown-linux-gnu` in a Debian 12-compatible build environment away from the production host, using glibc 2.36-compatible dependencies. Inspect artifact requirements and verify real execution on Debian 12. Native Fedora/glibc 2.43 test results alone do not qualify delivery. Preparing a compatible builder belongs to the assigned build/DevOps work; a musl build is optional only after DNS/TLS/ping compatibility tests.
 - Test both Windows and the selected Linux baseline. A successful cross-compile alone does not prove Linux runtime behavior. The [Rust platform-support reference](https://doc.rust-lang.org/rustc/platform-support.html) documents target support; actual deployment compatibility still needs verification.
 - Ship a stripped binary containing web assets, checksums, version/build information, dependency/license inventory, operator documentation and later-tested deployment templates. Do not require Rust, Node, compilers, Docker, or a SQLite server on the target.
 - Embed/bundle the intended SQLite library and record its actual runtime version for advisory review. TLS trust roots and custom internal CA configuration must be documented and tested on Linux.
@@ -50,6 +50,13 @@ Propose systemd MemoryHigh 96 MiB and MemoryMax 128 MiB for the Rust service; te
 Bound aggregate application and monitor-vhost logs to 64 MiB. Avoid changing system-wide journald retention in a way that removes unrelated services' logs; choose per-service storage or a verified namespace where available. Keep a small amount of actionable error metadata and rate-limit repeated failures.
 
 ## Backup and restore
+
+The owner is considering NAS-initiated SSH pull backups. Prefer fetching a
+completed, consistent SQLite snapshot produced through the supported service
+backup mechanism. Do not copy live DB/WAL files independently or let an SSH
+helper bypass the shared process-ownership contract. The NAS path, restricted
+SSH account/key, collection schedule and remote retention remain operator inputs.
+No backup automation or SSH access is authorized by this planning update.
 
 Propose daily backup and before upgrades. Keep one local snapshot at most; preflight worst-case snapshot size and available reserve before starting. Use incremental SQLite backup, copy to an existing external destination if available, verify checksum/integrity and permissions, then rotate staging deliberately. If no external destination exists, disclose that the single local backup does not survive host/disk loss.
 

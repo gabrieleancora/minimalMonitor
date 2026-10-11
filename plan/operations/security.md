@@ -110,6 +110,24 @@ family selection, and connect only to capability addresses on
 every attempt. No resolver or probe transport is implemented in WP-02; live
 rebinding, redirects and verified TLS must additionally be tested at that boundary.
 
+## D-21 all-TCP grant extension for WP-03
+
+Owner-authorized production grants are `192.168.1.0/24` and `10.172.73.1/32`,
+all TCP ports and ping in both. Add an explicit `all_tcp_ports` boolean, default
+false, to the rule schema. When true it permits ports 1–65535 for HTTP/HTTPS/TCP;
+`ports` must be empty/omitted. When false, retain the existing at-most-64 explicit
+nonzero ports. Reject conflicting nonempty `ports` plus `all_tcp_ports=true`.
+An empty port list by itself grants no TCP access; `ping` remains independent.
+At least one of an explicit port, all-TCP permission or ping must be enabled.
+
+This is a planned extension, not supported by the completed WP-02 binary. Keep
+the 64-rule cap and constant-size all-TCP representation. Do not enumerate every
+port, change WireGuard/Nginx or auto-enable private ranges. Existing metadata,
+network/broadcast, mixed-DNS and exact-loopback checks take precedence. Preserve
+public-destination behavior; these grants authorize only the named private ranges.
+Test both authorized ranges, ungranted private neighbors, ports 1/65535, port 0
+rejection, independent ping permission and hard denials under all-TCP grants.
+
 ## Browser and secrets
 
 Use automatic HTML escaping, no rendering target data as HTML, parameterized SQL and a restrictive CSP (`self` assets, no framing, no objects, no unsafe inline script). Add no-sniff, a restrictive referrer policy and `Cache-Control: no-store` for authenticated HTML/API data. All resources are local except server-side Telegram/target connections.

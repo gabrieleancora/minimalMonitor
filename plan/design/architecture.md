@@ -43,14 +43,16 @@ WP-02 adds one admitted blocking Argon2 task, retaining its permit through
 cancellation. Login and password change share the global hash-start limiter;
 no waiting hash queue is introduced. Signed preauth is stateless, session rows
 remain capped at five and the expiring login IP map at 2048. Destination policy
-contains at most 64 grants, with at most 64 ports each; validated answer sets
+contains at most 64 grants, with at most 64 explicit ports each; D-21 extends
+WP-03 with a mutually exclusive constant-size all-TCP flag, not a larger port
+list. Validated answer sets
 contain at most 32 supplied addresses as a defensive library ceiling; monitoring
 transports retain the stricter eight-answer limit and reject oversized whole
 resolutions before calling the policy. Account/session commands reuse the database
 worker's channel and worker-side write admission. Existing connection/body/header
 deadlines remain intact; credential JSON has a stricter 1024-byte limit.
 
-- Scheduler owns due times and bounded monitor state; four total probe slots, at most one active probe per monitor.
+- Scheduler owns due times and bounded monitor state; four total probe slots, at most one active probe per monitor. D-19's 30-second confirmation waits replace normal slots; admission budgets the faster cadence as defined in the monitoring contract.
 - Start with two Tokio runtime workers. Database work runs on one dedicated thread with one connection and a bounded command channel (128 commands). Short queries and batched retention avoid blocking probe result persistence for long periods.
 - Password hashing uses a separate blocking task guarded by a one-permit semaphore and no unbounded waiting queue.
 - Alert sender has one independent outbound slot, a ten-second deadline, and durable bounded jobs. It does not occupy probe slots.
@@ -61,6 +63,12 @@ deadlines remain intact; credential JSON has a stricter 1024-byte limit.
 ## RAM budget
 
 Budget covers incremental deployment overhead, not the host's pre-existing Nginx/WireGuard memory.
+
+The 2026-10-11 [production snapshot](../operations/production-environment.md)
+reports only 147 MiB available with no swap. The allocations below remain
+ceilings and qualification targets, not reserved host capacity. Deployment must
+fit measured normal-load headroom with an operating margin; a 256 MiB envelope
+pass alone cannot establish suitability for this snapshot.
 
 | Component | Proposed allocation |
 | --- | ---: |

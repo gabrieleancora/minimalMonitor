@@ -17,11 +17,52 @@ Updated: 2026-10-11. "Proposed" is a planning baseline, not owner approval or a 
 | D-09 | Confirmed scale; proposed limits | Owner expects 10–15 services. Qualify at 15; propose a hard configuration cap of 50 plus scheduler capacity admission. Higher qualified capacity requires new evidence. |
 | D-10 | Confirmed | Seven days raw probes, 90 days hourly aggregates, bounded incidents; sample-based uptime with separate coverage. Incidents log do not get deleted after 90 days but remain for 180 days. |
 | D-11 | Confirmed infrastructure; proposed integration | Existing Nginx and WireGuard to the home network. Integrate a dedicated Nginx virtual host and loopback Rust listener; preserve current routing and other sites. |
-| D-12 | Proposed | Budget incremental service resources, extra Nginx overhead, data, logs and backup staging. Keep 256 MiB RAM conservative; disk cannot exceed 2 GiB. Host reports: 874 MiB RAM total, approximately 574 MB in use. |
+| D-12 | Budget retained; production snapshot updated | Keep the 256 MiB incremental RAM ceiling and firm 2 GiB disk limit. On 2026-10-11 the owner reports 873 MiB RAM total, only 147 MiB available, no swap, and 2.9G filesystem space available. Actual headroom and finished-app usage must be qualified before deployment; the ceiling is not a claim that 256 MiB is free. See the production environment record. |
 | D-13 | Confirmed | Telegram down/recovery alerts plus dashboard incidents in the first release. |
-| D-14 | Development environment available; production baseline open | Owner-provided Fedora 44 x86_64 development machine through `remote-dev`, scoped to `/home/gabriele/rust-develop/minimalMonitor`; Rust 1.99.0/GCC/glibc 2.43 tested on 2026-10-09. See [access/workflow](operations/linux-development.md). Exact production distro/minimum glibc remains unresolved; Fedora success does not establish compatibility with older Linux distributions. |
+| D-14 | Production baseline confirmed; artifact verification outstanding | Production is Debian 12 bookworm x86_64, glibc 2.36, kernel 6.1.0-38-cloud-amd64, systemd 252 (PID 1), per owner output on 2026-10-11. See [production environment](operations/production-environment.md). The separate Fedora 44/glibc 2.43 development machine and its [workspace boundary](operations/linux-development.md) remain available. Build and execute a Debian 12-compatible artifact elsewhere; Fedora success alone does not qualify it. |
 | D-15 | Resolved by measured WP-00 experiment | Original reqwest 0.12.28 probe accepted 33 KiB headers. Owner requested Hyper: Hyper 1.12.0 HTTP/1 now sets `max_header_size(32768)`, `max_buf_size(32768)` and `max_headers(100)` with verified rustls TLS. Windows/Fedora accept an exact 32 KiB wire header block and reject one byte over, large single/cumulative/fragmented/unterminated blocks and excess header count. The 32 KiB contract was preserved; reqwest is test-only in the prototype and remains proposed for the separate Telegram sender. See [WP-00 evidence](agents/reports/WP-00.md). |
 | D-16 | WP-01 implementation baseline, 2026-10-10 | Root application pins Rust 1.98.1 and a committed lockfile. Tests use existing stable installations: Windows 1.98.1, Fedora 1.99.0; no shared toolchain installation. Axum 0.8.9/Tokio 1.53.2/Hyper 1.12.0 remain the foundation stack. rusqlite 0.40.2 bundles SQLite 3.53.2, updating WP-00's older SQLite for later security fixes. A persistent state-directory OS lock is shared by the service and future local account commands; the SQLite thread retains exclusive ownership through close. The intermediate server exposes local health only, with bounded one-request HTTP/1 connections; feature packages must retain or strengthen the same bounds. See [WP-01 evidence](agents/reports/WP-01.md), [runtime foundation](design/architecture.md), [schema](design/data-model.md) and [scoped acceptance](validation/acceptance.md#wp-01-foundation-evidence). No confirmed product/retention/resource requirement changes. |
+
+## D-19: Check cadence (confirmed 2026-10-11)
+
+The owner accepts 60-second normal checks, five-second deadlines and three
+consecutive target failures before down. After the first failure, schedule the
+remaining confirmation checks 30 seconds apart; success cancels confirmation.
+The implementation contract measures each 30-second wait from completion of
+the preceding failed check, avoids overlapping/duplicate regular checks, and
+returns to the normal cadence after confirmation, success or a local fault.
+See [monitoring](design/monitoring.md) for scheduling and coverage details.
+
+Two waits total 60 seconds, not two minutes after the first observed failure.
+With five-second check durations, confirmation takes up to about 70 seconds
+after that first failed result, or 135 seconds from outage onset including the
+initial normal-check wait, before scheduler/delivery delay. The owner's roughly
+two-minute alert goal is interpreted through the explicit 30-second cadence;
+it is not an exact delivery-time guarantee.
+
+## D-20: Deployment choices (confirmed inputs, 2026-10-11)
+
+The VPS monitors private home endpoints over WireGuard; about 90% of services
+are at home. Shared home connectivity failures can make them all unreachable.
+Dashboard origin is `https://monitor.gabry.win` with existing wildcard TLS.
+Private DNS resolves on the VPS; internal HTTPS uses Let's Encrypt certificates
+for `*.local.gabry.win`. Alerts go to a Telegram channel. NAS-initiated SSH pull
+backups are being considered; implementation and access details remain open.
+See [production environment](operations/production-environment.md) for evidence,
+memory headroom, remaining integration checks and backup constraints.
+
+## D-21: Private destination permissions (confirmed 2026-10-11)
+
+The owner permits all TCP ports (1–65535, including HTTP/HTTPS destinations)
+and ping within `192.168.1.0/24` and `10.172.73.1/32`. Application enforcement
+remains independent of WireGuard routes, with hard-denied destinations and
+network/broadcast exclusions preserved. No other private range is authorized.
+
+WP-02 currently accepts at most 64 explicit ports per grant. WP-03 must add a
+compact explicit all-TCP option as specified in [security](operations/security.md),
+with configuration and policy regression tests, before integrating transports.
+Do not expand a range into 65,535 stored ports or interpret an empty list as all.
+This is a new owner requirement for the next package, not a missing WP-02 fix.
 
 ## D-18: Incident retention without a row-count cap (confirmed 2026-10-11)
 
@@ -85,13 +126,13 @@ The owner-authorized Hyper prototype closes D-15: 13 Windows and 14 Fedora tests
 
 | Question | Interim assumption | Changes affected |
 | --- | --- | --- |
-| What check interval is desired? | 60 seconds; scale confirmed as 10–15 | Resource and retention qualification |
-| How much additional Nginx overhead is available? | Reserve incremental headroom inside 256 MiB; existing process is already running | Resource qualification |
-| Which Linux distribution/version, CPU, and storage? | Systemd-based Linux with local persistent disk | Artifact compatibility, limits, performance |
-| Which exact private CIDRs, hosts and ports should be allowed? | Existing WireGuard reaches home; allow only operator-declared private destinations | Outbound destination policy |
-| Is the monitor independent of monitored hosts? | Unknown | Reliability expectations and external watchdog |
+| Will normal-load RAM headroom accommodate the finished app? | 147 MiB available in the current snapshot; retain existing ceilings and measure service plus extra Nginx cost | WP-06/WP-07 deployment qualification, not a user estimate |
+| Which NAS backup destination, SSH identity, schedule and remote retention? | NAS-pull direction only; daily and pre-upgrade snapshots remain proposed | WP-06 backup/restore runbook |
+| Which exact monitor hostnames and check types? | Private endpoints within D-21's authorized ranges/ports; DNS already resolves | Initial monitor configuration |
+| Which backend port and existing Nginx/certificate/DNS details? | Existing proxy and TLS arrangement preserved | WP-06 integration inspection |
+| Which Telegram channel ID and bot credentials? | Channel destination confirmed; provision token through a secret file | WP-04/WP-06 setup, no credentials in planning reports |
 
-The owner answered the initial scope questions on 2026-10-06; those answers are incorporated above. Remaining questions do not block independent planning. Settle deployment-specific values before production qualification. Telegram token and destination chat are secrets/configuration to provision later, not information to request in planning chat.
+The owner answered the initial scope questions on 2026-10-06 and supplied production/cadence/network answers on 2026-10-11; those answers are incorporated above. Remaining inputs do not block separately assigned implementation against the confirmed contracts. Settle deployment-specific values before production qualification. Telegram token and destination chat are secrets/configuration to provision later, not information to request in planning chat.
 
 ## Tradeoffs to preserve
 

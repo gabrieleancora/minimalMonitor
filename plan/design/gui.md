@@ -38,6 +38,11 @@ The overview and selected-monitor detail share the same navigation shell. Status
 
 Do not add a "check now" control in the first release: periodic scheduling is sufficient and avoids a second probe admission path. Target policy rejections explain how the operator can update permitted destinations without exposing unrelated network details.
 
+Show the confirmed normal interval separately from the fixed 30-second wait
+between pending-failure confirmation checks. Pending status shows the current
+failure count and next check time. Explain that confirmation checks contribute
+to sample-based availability; do not label the percentage time-based uptime.
+
 ## Themes
 
 Three options: Light, Dark, System. Default follows the OS. Store the preference in browser local storage, apply before first paint through a CSP-compatible local asset, and fall back gracefully when storage is unavailable. Login follows the same appearance preference. All controls and charts switch together.

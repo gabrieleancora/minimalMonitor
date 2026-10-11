@@ -1,10 +1,10 @@
 # Telegram alert contract
 
-Telegram is required for the first release. One bot and one configured destination chat are sufficient for the owner's 10–15 services. No inbound Telegram webhook, command handler, or polling bot is needed.
+Telegram is required for the first release. The owner confirmed one destination channel containing the owner and other bots (D-20); one sending bot is sufficient for the 10–15 services. No inbound Telegram webhook, command handler, or polling bot is needed.
 
 ## Setup and content
 
-The operator creates a bot and provisions its token using a service-readable secret file outside the repository. The administrator configures the destination chat ID, enables delivery, and requests a test message through the authenticated settings page. Never return the token to the browser; show only whether it is configured. Bot creation and determining the chat ID belong in the future operator runbook. A user must make the destination available to the bot before a private message can be delivered.
+The operator creates a bot and provisions its token using a service-readable secret file outside the repository. The administrator configures the destination channel's chat ID, enables delivery, and requests a test message through the authenticated settings page. Never return the token to the browser; show only whether it is configured. Bot creation and determining the chat ID belong in the future operator runbook. Add the bot to the channel with administrator posting permission (`can_post_messages`), then verify a controlled test; existing bots require no integration. See [Telegram administrator rights](https://core.telegram.org/bots/api#chatadministratorrights).
 
 Use Telegram `sendMessage` over verified HTTPS to the fixed official API origin. Do not allow user-supplied API base URLs in production. The token is part of the API request path, so redact URLs as well as headers and errors. Use plain text, no parse mode, and disable link previews. The API provides error data including retry information. See the [Telegram Bot API](https://core.telegram.org/bots/api).
 

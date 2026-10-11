@@ -49,7 +49,7 @@ Telegram is required for the first release. Email and arbitrary webhooks are def
 
 ## Proposed capacity and quality targets
 
-The authoritative resource allocations are in [architecture](design/architecture.md). The baseline is 15 monitors at 60-second intervals, five-second total check deadlines, two browser tabs, and a single administrator. Test both successful probes and all-target timeout conditions. Retain the original conservative 256 MiB incremental RAM allowance; the owner's later host figures do not authorize consuming all remaining RAM. The 2 GiB disk budget is a hard requirement.
+The authoritative resource allocations are in [architecture](design/architecture.md). The confirmed default cadence is 60 seconds normally, five-second check deadlines and three consecutive failures before down, with 30-second waits between pending-failure confirmation checks (D-19). Qualify at 15 monitors, two browser tabs and one administrator, including simultaneous confirmations and all-target timeouts. Retain the 256 MiB incremental RAM ceiling and firm 2 GiB disk limit. The production snapshot has only 147 MiB available RAM: that ceiling is not permission to consume unavailable headroom. See [production inputs](operations/production-environment.md); actual deployment still needs resource qualification.
 
 - New checks normally start within two seconds of their due time at baseline.
 - Local API response time is p95 below 300 ms on declared test hardware, excluding probes and password hashing.
@@ -59,3 +59,8 @@ The authoritative resource allocations are in [architecture](design/architecture
 - Resource targets must be measured on Linux before describing the product as suitable for the small host.
 
 If the monitored server and monitor share a host, power supply, or network connection, one failure can remove both. An independent external check of the monitor is a deployment recommendation; the service cannot report its own complete outage from the failed host.
+
+The owner confirms a separate VPS monitor with approximately 90% of targets at
+home over WireGuard. Home router/connectivity failure can make those targets
+unreachable together while the monitor stays running. This is expected behavior;
+automatic network-root-cause diagnosis remains outside scope.

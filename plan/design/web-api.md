@@ -51,6 +51,10 @@ Appearance preference is local to the browser and does not need a database write
   `/login` contains a public minimal form and signed preauth token; its local
   `/assets/login.js` posts JSON and uses safe text for errors. Full GUI is WP-05.
 - URL length <= 2048 bytes, host <= 253 characters, port 1–65535, monitor name <= 100 characters. Reject userinfo, fragments, unsupported schemes, control characters and ambiguous target parsing. Error text returned to clients <= 256 characters.
+- Validate cadence/capacity using D-19's confirmation-aware admission rule,
+  not just the normal interval. Return pending failure count and next due time
+  to the GUI; the 30-second confirmation wait is fixed in this release. Browser
+  monitor requests cannot modify D-21's operator-managed destination grants.
 - Telegram chat ID is validated and stored in a type that preserves its full signed value. No arbitrary destination URL or token field in the browser API.
 - API responses <= 256 KiB. History bounds: maximum 90-day window, declared granularity and coverage, no more than 300 points. Raw-detail views, if added later, require separate bounded pagination.
 - No GET operation changes account, monitor or Telegram configuration. Session activity updates are internal bookkeeping, batched to avoid a write per poll.

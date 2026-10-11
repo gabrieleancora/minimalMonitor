@@ -12,7 +12,9 @@ status is fabricated. This is not a production release. See
 
 `rust-toolchain.toml` pins Rust 1.98.1; `Cargo.lock` pins the application graph.
 Bundled SQLite needs a C compiler on the development builder, not on the service
-host. The production distribution/minimum glibc remains an owner decision.
+host. The production baseline is Debian 12 x86_64/glibc 2.36; Fedora development
+builds still require separate Debian-compatible artifact validation. See the
+[production environment record](plan/operations/production-environment.md).
 
 ```text
 cargo fmt --all -- --check
