@@ -153,8 +153,9 @@ indexes with no cascading history deletion, singleton records, FK constraints,
 unique observation slots/logical incident events, and session/monitor caps.
 Feature workers must still enforce validation, revision checks, bounded queues,
 retention, outbox limits, and atomic transitions; tables alone do not pass their
-acceptance gates. Confirmed 180-day incident retention is unchanged; WP-03 must
-resolve the closed-incident overflow policy before implementing writes.
+acceptance gates. Confirmed 180-day incident retention is unchanged; the owner
+removed the proposed incident row-count cap in [D-18](plan/decisions.md#d-18-incident-retention-without-a-row-count-cap-confirmed-2026-10-11).
+Existing database/disk-pressure safeguards apply; the overflow planning prerequisite is resolved.
 
 SQLite uses WAL, FULL synchronization, FK enforcement, a 2 MiB cache target,
 defensive mode, bounded SQL/value/column/parameter sizes and no attached

@@ -1,7 +1,7 @@
 # minimalMonitor planning workspace
 
 Status: specification baseline, completed WP-00 feasibility, WP-01 foundation and WP-02 backend security; later packages have not started.
-Updated: 2026-10-10.
+Updated: 2026-10-11.
 
 This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records completed implementation feasibility and remaining application release gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
 
@@ -38,7 +38,7 @@ The proposal is one Rust process with embedded web assets, SQLite, HTTP/HTTPS, T
 
 The owner expects 10–15 services and already has Nginx and a WireGuard connection to the home network. Qualify against 15 monitors, one check per minute, five-second deadlines, and two open dashboard tabs. Retain a conservative 256 MiB incremental RAM budget; the host has 874 MiB total and approximately 574 MB in use according to htop. The 2 GiB available disk limit is firm. These are design targets, not measured claims.
 
-Probe scope, Telegram, expected scale, and existing infrastructure are confirmed. Defaults such as intervals, retention, and single-admin access remain proposals; the Linux distribution and private target ranges remain open. Consult [decisions](decisions.md).
+Probe scope, Telegram, expected scale, and existing infrastructure are confirmed. Single-admin access and retention are confirmed; check intervals remain proposed, and the Linux distribution and private target ranges remain open. Consult [decisions](decisions.md).
 
 ## Maintaining this plan
 
@@ -61,3 +61,4 @@ Probe scope, Telegram, expected scale, and existing infrastructure are confirmed
 | 2026-10-10 | Owner review follow-up adds bounded WAL reclamation and a real pressure/recovery integration test without restart; deployment uses the shared persistent state lock. Final checks pass 19 Windows/20 Fedora tests. WP-02 remains unstarted. |
 | 2026-10-10 | Owner assigned WP-02 backend security. Account/session/CSRF, protected routes, request/hash limits, proxy identity and destination policy implemented; 32 Windows/33 Fedora tests, release lifecycle, Linux interactive commands and short capped exercise pass. Later packages remain unstarted. |
 | 2026-10-10 | WP-02 owner review hard-denies AWS IPv6 metadata before grants; regression and full checks pass with 33 Windows/34 Fedora tests. Eight remains the monitoring DNS limit; the 32-address policy-helper ceiling is separate. WP-03 incident overflow remains a prerequisite, and WP-03 is unstarted. |
+| 2026-10-11 | Owner removed the proposed incident row-count cap (D-18), preserving 180-day retention and existing disk safeguards. The incident-overflow prerequisite is resolved; WP-03 is ready for a separate owner assignment. |

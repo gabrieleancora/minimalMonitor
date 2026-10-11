@@ -79,7 +79,7 @@ gates remain unchanged and unqualified by these bounded security tests.
 ## Concrete behavioral cases
 
 - Reject HTTP/1 wire response header blocks exceeding 32 KiB through an enforced parser limit; accept the exact boundary and exercise single, cumulative, fragmented, unterminated and excess-count headers over HTTP/HTTPS. WP-00's Hyper tests pass this scoped feasibility case (D-15). The retained test-only reqwest characterization still reproduces the old gap and is not production probe acceptance evidence.
-- Retain incidents for confirmed D-10's 180-day window. Resolve bounded overflow behavior before WP-03; a proposed row ceiling cannot silently substitute 90-day or shorter retention.
+- Retain incidents for confirmed D-10's 180-day window and preserve open incidents. Per D-18 there is no incident row-count cap; crossing 10,000 closed incidents must not itself delete or reject incident records. Verify age-based cleanup and existing disk-pressure safeguards without shortening incident retention.
 - Success, failure, failure, failure opens exactly one incident at the third failure; next success closes it. Raw sample-based availability for that sequence is 2/5 = 40%, regardless of incident threshold.
 - Four completed results in five expected enabled slots, three successful, show 75% availability and 80% coverage. With no completed result, availability is N/A; with no enabled slot, coverage is N/A.
 - Paused time is excluded; a process outage produces unknown slots. Reboot, clock jumps, interval edits and late results cannot duplicate observations or inflate availability.
