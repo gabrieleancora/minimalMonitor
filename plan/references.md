@@ -21,6 +21,8 @@ Consulted on 2026-10-06. These primary references inform design decisions; resou
 | [Windows IcmpSendEcho2](https://learn.microsoft.com/en-us/windows/win32/api/icmpapi/nf-icmpapi-icmpsendecho2) | Native IPv4 ping adapter |
 | [Windows Icmp6SendEcho2](https://learn.microsoft.com/en-us/windows/win32/api/icmpapi/nf-icmpapi-icmp6sendecho2) | Native IPv6 ping adapter |
 | [Telegram Bot API](https://core.telegram.org/bots/api) | Outbound sendMessage and error contract |
+| [Telegram response parameters](https://core.telegram.org/bots/api#responseparameters) | Rechecked 2026-10-11: provider retry_after takes precedence over the local one-minute retry floor |
+| [Bark server API](https://github.com/Finb/bark-server/blob/master/docs/API_V2.md) | Consulted 2026-10-11: optional v2 fallback using JSON POST /push and a secret device key; verify installed version during assignment |
 | [Telegram bot FAQ](https://core.telegram.org/bots/faq#my-bot-is-hitting-limits-how-do-i-avoid-this) | Provider rate guidance; conservative local delivery limits |
 | [Uptime Kuma repository](https://github.com/louislam/uptime-kuma) | Requested visual/product reference |
 | [CISA DDoS guidance](https://www.cisa.gov/sites/default/files/publications/understanding-and-responding-to-ddos-attacks_508c.pdf) | Upstream mitigation and operational response |

@@ -62,6 +62,12 @@ WP-06 must provision the channel ID and secret-file token, grant the bot channel
 posting permission, and verify a test message. No inbound bot functionality is
 requested. See the [notification contract](../design/notifications.md).
 
+The sending Telegram bot is shared with other owner applications (D-22), so
+local pacing cannot prevent all provider rate limits. The owner also operates
+a Bark server at home for iPhone notifications. Its optional [v2 fallback](../design/bark-fallback.md)
+does not replace Telegram and may be unreachable during the same home outage.
+Its endpoint/version and secret provisioning remain future integration inputs.
+
 The owner is considering a NAS-initiated SSH pull from target servers. This is
 a preferred direction, not a configured backup system. WP-06 should prepare a
 consistent SQLite snapshot through the service's supported backup mechanism,

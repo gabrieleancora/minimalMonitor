@@ -21,6 +21,8 @@ This document remains the logical contract. WP-01 adds [foundation migration 1](
 | `health_state` | Bounded singleton operational state and counters, including dropped alerts and persistence faults |
 | `audit_events` | Bounded security/configuration event metadata; no tokens/passwords or probe payloads |
 
+WP-04 must persist Telegram's bot-wide rate-limit not-before timestamp in bounded singleton state, as well as each event's retry/expiry state; restarts must not bypass a provider cooldown (D-22). Optional v2 Bark provider outcomes and incident recovery routing are described in the [future fallback contract](bark-fallback.md); no Bark schema or generalized provider framework is required for WP-04.
+
 Foreign keys apply consistently. Index probe results by monitor/time, incidents by monitor/confirmation time, sessions by token hash and expiry, and pending notifications by state/next-attempt time. Delete monitor-owned history in bounded batches after disabling its schedule and canceling queued notifications; hide the tombstoned monitor immediately. No uncontrolled cascade through years of data in an interactive request.
 
 An idempotency key reused with a different request digest is a conflict. A matching retry returns the already committed result without a second mutation. Evicted or expired keys provide no deduplication guarantee; clients must not automatically retry a create beyond that window.

@@ -21,6 +21,7 @@ release; WP-03 through WP-07 remain separately assignable.
 | [Architecture](design/architecture.md) | Rust components, runtime boundaries, and resource budgets |
 | [Monitoring behavior](design/monitoring.md) | Check semantics, scheduling, incidents, and availability |
 | [Telegram alerts](design/notifications.md) | Delivery, retries, secret handling, and flood control |
+| [Bark fallback — version two](design/bark-fallback.md) | Optional home-hosted fallback; Telegram remains primary; unassigned |
 | [Data model](design/data-model.md) | Logical SQLite schema, retention, and failure handling |
 | [Web and API contract](design/web-api.md) | Pages, operations, validation, and errors |
 | [GUI design](design/gui.md) | Uptime Kuma inspired layout, day/night themes, and accessibility |
@@ -53,6 +54,7 @@ Probe scope, Telegram channel destination, scale, single-admin access, retention
 
 | Date | Change |
 | --- | --- |
+| 2026-10-11 | D-22 records shared Telegram bot use, one-minute transient retries and durable provider cooldown; optional Bark fallback is planned as unassigned V2-01. No application changes. |
 | 2026-10-06 | Initial planning package; no application code, runnable deployment files, or agents created. |
 | 2026-10-06 | Owner confirmed ping and Telegram, 10–15 services, existing Nginx/WireGuard, and non-negotiable disk limit. |
 | 2026-10-06 | Owner assigned WP-00. Windows prototype tested; Linux tooling/permission and HTTP header-limit gaps recorded. No subsequent package or production change started. |

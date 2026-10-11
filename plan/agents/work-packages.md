@@ -8,10 +8,14 @@ WP-00 was assigned by the owner on 2026-10-06, retested on Fedora on 2026-10-09,
 | WP-01 | Backend foundation | WP-00 | Project layout/toolchain, config validation, worker bounds, process ownership, schema/migrations, health and error model; Windows/Linux build checks. |
 | WP-02 | Backend security | WP-01 | Local admin bootstrap/reset, password/session/CSRF lifecycle, route protection, input/concurrency limits, destination policy and secret redaction; V-03 and relevant V-06 evidence. |
 | WP-03 | Backend monitoring | WP-01, destination policy from WP-02; D-18/D-19/D-21 owner decisions | Extend policy with the bounded all-TCP flag (D-21), then HTTP/TCP/ping adapters, normal/confirmation scheduler, revision-safe transitions, incidents, coverage and aggregation; deterministic V-04/V-05 and policy evidence, eight-answer resolution limit, 180-day incidents without a row-count cap. |
-| WP-04 | Backend notifications | WP-02, WP-03 incident contract | Telegram secret integration, transactional outbox, digest/order/retry/rate/expiry limits and visible health; V-11 evidence. |
+| WP-04 | Backend notifications | WP-02, WP-03 incident contract, D-22 | Telegram secret integration, transactional outbox, digest/order/expiry limits, 60-second transient retries, durable shared-bot 429 cooldown and visible health; V-11 evidence. Bark is deferred. |
 | WP-05 | GUI + API integration | WP-02, WP-03; WP-04 for alert settings completion | Responsive original Kuma-inspired GUI, themes, forms, charts/coverage, stale states, account and Telegram settings; V-02 evidence/screenshots. |
 | WP-06 | DevOps | WP-00/WP-01, D-14/D-20 and production environment record; completed app for final integration | Debian 12/glibc 2.36-compatible build/runtime verification, current resource headroom, release packaging, service hardening, narrow ping permission, existing Nginx/TLS integration, NAS snapshot-pull backup preparation and restore/upgrade docs; V-09/V-10 evidence. |
 | WP-07 | QA/security | WP-02 through WP-06 | Cross-component fault/security tests, 24-hour resource soak, retention and disk/backup/upgrade limits, restore rehearsal; complete acceptance report and release blockers. |
+
+## Second-version backlog (unassigned)
+
+**V2-01 — Optional Bark fallback:** after the Telegram/outbox and GUI contracts are implemented, add the [Bark fallback](../design/bark-fallback.md), provider-specific state/settings, migration, security and acceptance evidence. Telegram remains primary and still retries after Bark delivery. Reuse existing resource bounds and the owner's server. Confirm endpoint/version and secret provisioning before integration. This is a future assignment, not authorization to implement it or a WP-03/WP-04 release gate.
 
 ## Assignment prompts
 

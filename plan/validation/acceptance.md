@@ -16,7 +16,7 @@ The [WP-00 report](../agents/reports/WP-00.md) records passing Windows/Fedora fe
 | V-08 | R-03 | Actual incremental files <= 2 GiB, retention bounds, WAL pressure, full disk, log flood, backup and upgrade temporary-space preflight |
 | V-09 | R-06 | Native Windows behavior including ping adapter plus real Linux DNS/TLS/ping, permissions, signals and service lifecycle |
 | V-10 | R-07, R-12 | Dedicated Nginx integration/TLS/limits, loopback-only backend, private health routes, existing-site regression checks, WireGuard reachability, non-root ping |
-| V-11 | R-11 | Telegram test/down/recovery; digest, ordering, 429 retry-after, 5xx/network retry, permanent failure, restart, expired events, full outbox and possible duplicate handling |
+| V-11 | R-11 | Telegram test/down/recovery; digest, ordering, 60-second transient retries, 429 retry-after and durable bot-wide cooldown, permanent failure, restart, expired events, full outbox and possible duplicate handling |
 
 ## WP-01 foundation evidence
 
@@ -105,6 +105,7 @@ gates remain unchanged and unqualified by these bounded security tests.
 - A ping permission error shows monitor-system degradation and does not open target-down incidents. Wrong-source/mismatched echo replies do not pass.
 - Twenty saved target edits cannot allow stale in-flight results to overwrite the latest revision.
 - Telegram outage leaves the scheduler operational. A resolved incident waiting in the outbox cannot arrive as an undated, apparently current outage. A crash after remote send may duplicate delivery but never loses the durable logical event silently.
+- D-22: with a controlled clock, a failed Telegram request finishing at t=0 becomes retryable at t=60, never earlier; a 429 with `retry_after=120` blocks every local bot send, including new alerts/tests, until t=120 even after restart. A shorter provider wait still uses the 60-second floor. Cooldown waits do not consume attempts; the ten-attempt/six-hour limits and permanent-error stop remain enforced. Bark is not required for V-11; its [future acceptance](../design/bark-fallback.md#future-assignment-and-acceptance) belongs to V2-01.
 
 ## Resource qualification protocol
 

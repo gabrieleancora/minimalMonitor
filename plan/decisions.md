@@ -122,6 +122,14 @@ The 2026-10-09 Fedora rerun superseded the earlier lack of Rust/Linux feasibilit
 
 The owner-authorized Hyper prototype closes D-15: 13 Windows and 14 Fedora tests pass with the required parser limits. A disposable Linux user/network namespace also proves v4/v6 echo with only GID 1000 authorized, UID 1000, zero capabilities and no-new-privileges; the host-wide policy was untouched. WP-00's feasibility gate is complete and WP-01 may be separately assigned. Production still needs its own narrow service group, selected distro/glibc baseline and full application qualification. See [the updated report](agents/reports/WP-00.md).
 
+## D-22: Shared Telegram bot and optional Bark fallback (2026-10-11)
+
+Confirmed: the owner shares the Telegram bot with other applications and has a Bark server at home for iPhone notifications. Bark must not replace Telegram. On Telegram failure, try Bark when implemented/configured/available, then retry Telegram after one minute regardless of Bark outcome.
+
+Planning scope: keep Bark in version two, as suggested by the owner; V2-01 remains unassigned. Apply the one-minute transient retry to first-release WP-04 now, replacing the five-second exponential-backoff proposal. Honor a longer Telegram `retry_after` and persist its cooldown across all local bot sends/restarts. Permanent authentication/chat errors retain the existing stop-until-corrected exception, rather than repeatedly sending invalid requests.
+
+The [Telegram contract](design/notifications.md) is authoritative for retry timing and bounds. The [Bark proposal](design/bark-fallback.md) defines a single optional endpoint/device, bounded best-effort fallback, separate provider outcomes and recovery routing. Those detailed v2 defaults are proposals, not owner-specified behavior or implemented features. Bark shares the home's failure domain and cannot replace an external watchdog. Existing RAM/disk limits remain unchanged; WP-03 and later packages are not started by this decision.
+
 ## Questions awaiting owner input
 
 | Question | Interim assumption | Changes affected |

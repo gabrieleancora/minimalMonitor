@@ -45,7 +45,7 @@ Core operation does not depend on browser tabs remaining open. All sensitive GUI
 
 Deferred: DNS-specific probes, push/heartbeat monitors, agents installed on target servers, CPU/RAM metrics, certificate-expiry alerts, content matching, scripted checks, custom request bodies/credentials, public status pages, multiple users/roles, SSO, MFA, discovery, maintenance calendars, plugins, and clustered operation.
 
-Telegram is required for the first release. Email and arbitrary webhooks are deferred. Incident recording and notification delivery are separate operations so Telegram failure never stops checks.
+Telegram is required for the first release, including one-minute transient-failure retries and shared-bot rate-limit handling (D-22). Optional Bark fallback through the owner's existing home server is planned for version two and does not replace Telegram; see the [future contract](design/bark-fallback.md). Email and arbitrary webhooks remain deferred. Incident recording and notification delivery are separate operations so provider failure never stops checks.
 
 ## Proposed capacity and quality targets
 
