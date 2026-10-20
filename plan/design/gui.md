@@ -86,7 +86,7 @@ absence is unconfirmed delivery. This does not change incident or receipt retent
 
 ### Review corrections supplied
 
-WP05-R1/R2/R3 now have [implementation/regression evidence](../agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18), pending independent re-review. Live displays
+WP05-R1/R2/R3 have [implementation/regression evidence](../agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18) and were closed by [independent re-review on 2026-10-20](../agents/reports/WP-05-review.md#re-review-and-closure-2026-10-20). Live displays
 update in place while range/heartbeat controls retain focus. Unsaved settings and
 modal forms remain intact. Relative history ranges use a server-anchored full
 window; the newest incident page and receipts refresh together, while older pages

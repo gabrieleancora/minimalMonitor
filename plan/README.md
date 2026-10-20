@@ -1,7 +1,7 @@
 # minimalMonitor planning workspace
 
-Status: WP-00–WP-04 accepted for scoped handoff; WP-05 corrections supplied for WP05-R1/R2/R3; independent re-review pending; WP-06–WP-07 unstarted; full release qualification outstanding.
-Updated: 2026-10-18.
+Status: WP-00–WP-05 accepted for scoped handoff; WP05-R1/R2/R3 closed after independent re-review; WP-06–WP-07 unstarted; full release qualification outstanding.
+Updated: 2026-10-20.
 
 This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records completed implementation feasibility and remaining application release gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
 
@@ -18,7 +18,7 @@ The [2026-10-18 WP-04 re-review](agents/reports/WP-04-review.md#re-review-and-cl
 
 ## Reading order
 
-The [WP-05 review](agents/reports/WP-05-review.md) identified focused-view staleness, a failing 90-day range and missing incident refresh. [Corrections and regression evidence](agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18) are supplied; acceptance remains pending independent re-review.
+The [2026-10-20 WP-05 re-review](agents/reports/WP-05-review.md#re-review-and-closure-2026-10-20) closes all three findings after independent Windows/Fedora checks, 37 original browser checks and 17 focused regressions. WP-05 is accepted for scoped handoff; WP-06 is ready for separate owner assignment.
 
 | Document | Purpose |
 | --- | --- |
@@ -60,7 +60,8 @@ Probe scope, Telegram channel destination, scale, single-admin access, retention
 
 | Date | Change |
 | --- | --- |
-| 2026-10-18 | Owner assigned WP-05. Embedded responsive GUI, themes, guarded pages, bounded heartbeat previews, forms, coverage/history, settings and desktop/mobile evidence implemented. Independent review and full release gates remain outstanding. |
+| 2026-10-20 | WP-05 re-review closes WP05-R1/R2/R3. Independent formatting/clippy, 92 Windows/94 Fedora tests and 54 browser checks pass. WP-05 accepted; WP-06 ready for separate assignment; full release qualification remains outstanding. |
+| 2026-10-18 | Owner assigned WP-05. Embedded responsive GUI, themes, guarded pages, bounded heartbeat previews, forms, coverage/history, settings and desktop/mobile evidence implemented. Independent review and full release gates remained outstanding at that handoff. |
 | 2026-10-18 | WP04-R1 correction and independent re-review complete. Four injected-reply regressions and 91 Windows/93 Fedora tests pass; formatting/clippy independently pass on both platforms. Worker release/lifecycle evidence retained. WP-04 accepted for scoped handoff; WP-05 ready for separate assignment. |
 | 2026-10-14 | Owner assigned WP-04 and authorized source transfer/Linux validation. Telegram backend, protected APIs, durable retries/cooldown and bounded receipts implemented; 87 Windows/89 Fedora tests, release and lifecycle checks pass. One namespace-only ping test is skipped in the ordinary Fedora suite. Scoped WP-04 handoff complete; release qualification remains outstanding. |
 | 2026-10-14 | WP-03 re-review closes both blockers after independent formatting/clippy and 60 Windows/62 Fedora tests. WP-04 is ready for separate assignment; full release qualification remains outstanding. |

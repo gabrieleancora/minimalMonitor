@@ -1,6 +1,6 @@
 # Assignable work packages
 
-WP-00 was assigned by the owner on 2026-10-06, retested on Fedora on 2026-10-09, and completed through the owner-authorized Hyper follow-up on 2026-10-10. Its [report](reports/WP-00.md) records passing Windows/Linux feasibility, bounded HTTP parsing, narrowly authorized non-root Linux ping and capped footprint evidence. The owner separately assigned WP-01 and WP-02 on 2026-10-10; their [foundation](reports/WP-01.md) and [security](reports/WP-02.md) reports record completed scoped implementation and Windows/Fedora evidence. WP-03 was assigned on 2026-10-12; its [monitoring report](reports/WP-03.md) records completed scoped implementation and Windows/Fedora evidence. The owner assigned WP-04 on 2026-10-14; its notification implementation and platform evidence are recorded in [WP-04](reports/WP-04.md). The owner assigned WP-05 on 2026-10-18; its [GUI handoff](reports/WP-05.md) records implementation and scoped Windows/Fedora/browser evidence, pending independent review. WP-06–WP-07 remain unassigned and not started. The owner selects an agent and gives the relevant package ID. This is an ordered implementation plan, not authorization to start a subsequent package.
+WP-00 was assigned by the owner on 2026-10-06, retested on Fedora on 2026-10-09, and completed through the owner-authorized Hyper follow-up on 2026-10-10. Its [report](reports/WP-00.md) records passing Windows/Linux feasibility, bounded HTTP parsing, narrowly authorized non-root Linux ping and capped footprint evidence. The owner separately assigned WP-01 and WP-02 on 2026-10-10; their [foundation](reports/WP-01.md) and [security](reports/WP-02.md) reports record completed scoped implementation and Windows/Fedora evidence. WP-03 was assigned on 2026-10-12; its [monitoring report](reports/WP-03.md) records completed scoped implementation and Windows/Fedora evidence. The owner assigned WP-04 on 2026-10-14; its notification implementation and platform evidence are recorded in [WP-04](reports/WP-04.md). The owner assigned WP-05 on 2026-10-18; its [GUI handoff](reports/WP-05.md) records implementation and scoped Windows/Fedora/browser evidence, accepted after independent re-review on 2026-10-20. WP-06–WP-07 remain unassigned and not started. The owner selects an agent and gives the relevant package ID. This is an ordered implementation plan, not authorization to start a subsequent package.
 
 | ID | Suggested role | Dependencies | Deliverable / completion gate |
 | --- | --- | --- | --- |
@@ -13,15 +13,15 @@ WP-00 was assigned by the owner on 2026-10-06, retested on Fedora on 2026-10-09,
 | WP-06 | DevOps | WP-00/WP-01, D-14/D-20 and production environment record; completed app for final integration | Debian 12/glibc 2.36-compatible build/runtime verification, current resource headroom, release packaging, service hardening, narrow ping permission, existing Nginx/TLS integration, NAS snapshot-pull backup preparation and restore/upgrade docs; V-09/V-10 evidence. |
 | WP-07 | QA/security | WP-02 through WP-06 | Cross-component fault/security tests, 24-hour resource soak, retention and disk/backup/upgrade limits, restore rehearsal; complete acceptance report and release blockers. |
 
-## WP-05 review gate (open 2026-10-18)
+## WP-05 review gate (closed 2026-10-20)
 
-The [independent review](reports/WP-05-review.md) records passing 92 Windows/94 Fedora tests and 37 browser checks, but leaves WP05-R1/R2/R3 open: focused controls freeze live main-pane data, the 90-day window can fail against a stale summary timestamp, and the Incidents page stops refreshing after initialization. [Corrections and focused regression evidence](reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18) are now supplied; independent re-review is required before accepting WP-05. WP-06/WP-07 remain unassigned.
+The [independent re-review](reports/WP-05-review.md#re-review-and-closure-2026-10-20) closes WP05-R1/R2/R3 after code review, passing formatting/clippy on both platforms, 92 Windows/94 Fedora tests and 37 original plus 17 focused browser checks. WP-05 is accepted for scoped handoff. WP-06 is ready for a separate owner assignment; WP-06/WP-07 remain unassigned and unstarted. Full release qualification remains outstanding.
 
 ## WP-04 review gate (closed 2026-10-18)
 
 The [independent re-review](reports/WP-04-review.md#re-review-and-closure-2026-10-18) closes WP04-R1 after inspecting same-sender reconciliation and rerunning formatting/clippy and the full suites: 91 Windows/93 Fedora tests pass, including four deterministic reply-loss regressions. The [worker correction report](reports/WP-04.md#wp04-r1-correction-2026-10-18) retains release/lifecycle evidence and qualification limits.
 
-WP-04 is accepted for its scoped handoff. WP-05 was subsequently assigned on 2026-10-18; its implementation is pending independent review. WP-06–WP-07 remain unassigned and unstarted. Full release qualification remains outstanding.
+WP-04 is accepted for its scoped handoff. WP-05 was subsequently assigned on 2026-10-18 and accepted after re-review on 2026-10-20. WP-06–WP-07 remain unassigned and unstarted. Full release qualification remains outstanding.
 
 ## WP-03 review gate (closed 2026-10-14)
 

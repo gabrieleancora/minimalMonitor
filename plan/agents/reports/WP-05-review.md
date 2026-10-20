@@ -1,6 +1,6 @@
 # WP-05 planning-agent review
 
-Date: 2026-10-18. Verdict: **WP-05 acceptance is pending WP05-R1/R2/R3.** The implementation and plan updates fit the assigned GUI scope, but live display freshness and the 90-day range need correction before handoff.
+Current verdict (2026-10-20): **WP05-R1/R2/R3 are closed; WP-05 is accepted for its scoped handoff.** Independent code, Windows/Fedora and browser checks confirm the corrections. WP-06 is ready for a separate owner assignment. The original 2026-10-18 findings and observations below remain as history; the closure section supersedes their pending status. Full release qualification remains outstanding.
 
 ## WP05-R1 — P2: focused controls indefinitely freeze visible monitor status
 
@@ -57,3 +57,27 @@ Updated the index, work-package gate, worker report notice, D-25, GUI contract a
 ## Implementation follow-up supplied (2026-10-18)
 
 The owner assigned the GUI agent to apply these findings. [Corrections and maintained regression evidence](WP-05.md#wp05-r1r2r3-corrections-2026-10-18) are now supplied: keyed live display updates preserving focus/forms (R1), a full server-anchored relative history window (R2), and newest incident/receipt polling with explicit older snapshots and retry freshness (R3). The worker reran 92 Windows/94 Fedora tests, formatting/clippy/release/lifecycle checks, the original 37 browser checks and 17 focused review regressions. Original findings and review observations above are retained. **This implementation follow-up is not independent re-review or acceptance closure.**
+
+## Re-review and closure (2026-10-20)
+
+No remaining actionable blocker was found in the corrections and affected paths. All three findings are closed:
+
+- **WP05-R1:** live main-pane updates no longer depend on absence of keyboard focus. Bounded keyed DOM reconciliation preserves surviving controls, focus and expanded disclosures while updating status, freshness, warnings and event handlers with current revisions. Settings and modal input values remain intact. The desktop range, mobile heartbeat, overview reorder, changing chart-height and unsaved-form regressions pass.
+- **WP05-R2:** the existing guarded history endpoint accepts exclusive `range_ms`, resolving both endpoints and validation against the same current server timestamp. The full 90-day window is preserved without a client-side margin. Route checks reject mixed, duplicate, invalid and oversized ranges while retaining explicit-window validation. Browser checks pass after a 6.2-second delay, a controlled two-minute-old summary and hidden-tab resume.
+- **WP05-R3:** newest incident and receipt data refresh together on the visible-tab cadence with a per-section guard covering both reads. Older pages retain an explicitly dated snapshot and cursor, with same-page refresh and return-to-newest controls. Failed refreshes preserve the prior snapshot with a stale notice. Timer-driven empty-to-incident, recovery/delivery, pagination, hidden-tab and failure/retry regressions pass.
+
+Independent validation against the corrected sources on 2026-10-20:
+
+| Check | Windows | Existing isolated Fedora correction checkout |
+| --- | --- | --- |
+| `cargo fmt --all -- --check` | Pass | Pass |
+| `cargo clippy --locked --all-targets --offline -- -D warnings` | Pass | Pass |
+| `cargo test --locked --offline` | 92 passed; zero failed/ignored | 94 passed; zero failed; one existing namespace-only ping test ignored |
+
+Used installed stable toolchains, disabled rustup auto-install and retained project-local caches/target/temp directories. Linux checks ran at `remote-dev:/home/gabriele/rust-develop/minimalMonitor/validation/wp05/corrections-20261018`. All 48 selected files matched the current normalized transfer manifest locally and remotely; manifest SHA-256: `668cf743e3a3bfe43aa4f58b4b4ed0f825c8f01405242ce2c69ba2546e951e05`. No source transfer or host configuration change was needed.
+
+Built the existing `gui-review` example, then reran `browser-review.mjs` and `refresh-regressions.mjs` with the bundled Node/Playwright packages and installed Edge 155.0.4283.62: **37 original browser checks plus 17 focused regressions passed**, with zero captured JavaScript/CSP errors. Only evidence destinations were changed in memory to `target/wp05-rereview-20261020/browser` and `target/wp05-rereview-20261020/corrections`, preserving worker evidence. Visually inspected the new mobile focused-heartbeat/updated-status and desktop recovery/delivery screenshots. The existing fixture used ephemeral credentials and controlled temporary SQLite data; no scheduler, probe or Telegram sender ran.
+
+The plan updates accurately document the small additive history query and live-refresh behavior. Retention, authentication, destination policy and resource bounds remain intact. Updated the current review status in the index, work packages, worker report, D-25, GUI specification and acceptance plan; documentation link and whitespace checks pass. No application source or maintained test was changed, no agent dispatched, and no commit or deployment created.
+
+The worker's release/lifecycle evidence was inspected, not independently rerun. Namespace-only ping permission, Debian 12/glibc 2.36 compatibility, live Telegram/channel permissions, production integration, backup/restore, resource soak and broader accessibility/browser qualification remain their existing later gates. WP-06 is ready for separate assignment; acceptance does not deploy the service or start WP-06/WP-07.

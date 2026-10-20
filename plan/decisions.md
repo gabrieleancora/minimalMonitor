@@ -229,7 +229,7 @@ helper/queue limit or confirmed notification requirement changes. See the
 
 ## D-25: WP-05 GUI integration (2026-10-18)
 
-Review status: [WP05-R1/R2/R3](agents/reports/WP-05-review.md) leave acceptance pending live-view freshness and 90-day-range corrections. The implementation choices below remain relevant; these corrections enforce existing behavior without adding infrastructure or relaxing retention/security bounds.
+Review status 2026-10-20: [WP05-R1/R2/R3 re-review](agents/reports/WP-05-review.md#re-review-and-closure-2026-10-20) closes all three findings after independent platform/browser checks. WP-05 is accepted for scoped handoff. The implementation choices below remain relevant; these corrections enforce existing behavior without adding infrastructure or relaxing retention/security bounds.
 
 The owner assigned the GUI agent WP-05. Serve embedded, nonsensitive HTML/CSS/JS
 with system fonts and no frontend build/runtime dependency. The existing
@@ -269,7 +269,7 @@ first cannot eliminate network transit at an exact 90-day boundary; arbitrary
 client-side padding would omit retained history. Server anchoring preserves the
 full requested window, existing explicit-window behavior, 90-day retention,
 300-bucket and response-size bounds. See the [correction report](agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18).
-Independent re-review remains required; the initial findings are retained.
+Independent re-review closed the three findings on 2026-10-20; the initial findings are retained as history.
 
 ## Tradeoffs to preserve
 
