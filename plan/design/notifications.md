@@ -2,6 +2,23 @@
 
 Telegram is required for the first release. The owner confirmed one destination channel containing the owner and other bots (D-20) and shares the sending bot with other applications (D-22). No inbound Telegram webhook, command handler, or polling bot is needed. Optional [Bark fallback](bark-fallback.md) is planned for version two; it never replaces Telegram.
 
+WP-04 implements this contract with the existing Hyper/rustls dependencies
+(D-24). The fixed official hostname uses public trust roots and rejects the whole
+DNS answer set on special/private addresses or more than eight answers; at most
+two numeric addresses may be tried before POST. There is one POST per admitted
+attempt, no redirect, compression or proxy environment support, a ten-second
+total deadline, 32 KiB response-header/parser bounds and a 64 KiB body bound.
+An observed HTTP 429 retains its numeric Retry-After even if the body stalls or
+fails; valid Bot API retry_after can extend the wait. All exposed errors are fixed
+categories; provider descriptions are discarded.
+
+Messages count UTF-16 units against the conservative 3000-character ceiling,
+include explicit UTC dates, stable incident IDs, snapshot monitor names and fixed
+probe-error categories, and omit target addresses/URLs. Five-second event windows
+are packed into bounded messages; a pending resolved down incorporates its
+recovery even outside that window, sharing one receipt. Acknowledged down delivery
+is retained on the incident independently of seven-day receipt metadata.
+
 ## Setup and content
 
 The operator provisions the existing bot's token using a service-readable secret file outside the repository; a dedicated replacement bot is not required. The administrator configures the destination channel's chat ID, enables delivery, and requests a test message through the authenticated settings page. Never return the token to the browser; show only whether it is configured. Bot creation for new installations and determining the chat ID belong in the future operator runbook. Add the bot to the channel with administrator posting permission (`can_post_messages`), then verify a controlled test; other bots require no integration. See [Telegram administrator rights](https://core.telegram.org/bots/api#chatadministratorrights).
@@ -32,3 +49,17 @@ Cap pending outbox storage at 1000 event rows and 2 MiB of serialized content; e
 Retain terminal delivery metadata for seven days, at most 2000 rows. Disabling delivery stops sends and marks pending jobs canceled; enabling it does not replay canceled history. Configuration changes must not silently redirect queued messages: cancel old-destination jobs with an audit record, then offer a new test. Rate-limit the test action to once per minute.
 
 If persistence fails, show delivery/storage degradation and do not create an unbounded memory queue. Telegram failure never alters target status or stops checking. A completely failed host or network path cannot send alerts; an independent external watchdog is still needed to observe the monitor itself.
+
+A storage timeout can leave the outcome of a claim uncertain even before transport starts. Reconcile such claims with bounded state on the running sender; do not leave an outstanding request blocking all later alerts until restart. Keep delivery/storage degradation visible until reconciliation, preserving single-sender admission, event ordering, attempt/expiry limits and provider cooldowns. Validate lost claim replies separately from failed delivery acknowledgements (WP04-R1).
+
+The WP04-R1 correction retains one notification permit while awaiting an uncertain
+claim's reconciliation. The sender cannot enter transport without a successful
+claim reply. Its next step submits `ReconcileUnsubmittedClaim` on the same SQLite
+worker, behind the earlier claim: either that claim did not commit, or its
+still-sending rows return to pending with the unsent reservation refunded and
+expiry enforced. Canceled/terminal jobs remain terminal. The existing request
+sequence is acknowledged without changing provider cooldown or pacing. This is
+idempotent even when the reconciliation reply is also lost. Delivery health
+stays degraded until a reconciliation reply confirms success. Only the same
+admitted sender, before transport, may use this operation. Requests that may
+already have reached transport retain the existing Finish/restart semantics.

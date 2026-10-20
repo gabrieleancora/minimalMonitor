@@ -24,6 +24,8 @@ All / Down / Paused        |  [Operational warning only when relevant]
 
 The overview and selected-monitor detail share the same navigation shell. Status counts must add up to the visible filter's total; distinguish pending, unknown and paused from down. Every monitor row includes text status, last observation age and a compact recent history indicator. On the overview, emphasize current failures before historical percentages.
 
+Live status, observation freshness and operational warnings must continue updating when a chart, heartbeat or other control has keyboard focus. Preserve focus and unsaved inputs without freezing the entire main pane. The newest incident page and its delivery state follow the bounded visible-tab refresh cadence; older-page navigation must retain the user's page and disclose any intentionally retained snapshot, with a refresh action. History ranges must remain valid at the rolling retention boundary even when the last summary timestamp is older than a few seconds. These existing freshness/history requirements are regression gates WP05-R1/R2/R3.
+
 ## Screens and flows
 
 | Screen | Required content and behavior |
@@ -66,3 +68,28 @@ Use system fonts, consistent spacing, modest rounded cards and minimal animation
 Charts have a textual summary/table alternative and timestamped values available by keyboard. Unknown gaps remain visibly empty/hatched rather than connected green history. Timeline bars and chart ranges state whether they show individual probes or aggregated buckets. Zero data shows N/A. Display times in browser local timezone with its label; persist UTC.
 
 Initial compressed page assets should total <= 250 KiB excluding API data; no external fonts, chart CDN or frontend runtime downloads. Qualify at 360-pixel mobile width and normal desktop width, in both themes. Future UI agents provide review screenshots and explain any design deviations in their handoff.
+
+## WP-05 implementation and review
+
+The [WP-05 report](../agents/reports/WP-05.md) and
+[desktop/mobile evidence index](../../validation/wp05/README.md) record the
+implemented local assets and review cases. Heartbeats show at most 12 actual
+individual observations from the summary; no synthetic successes fill gaps.
+Latency charts use the existing aggregated history API, label their scale and
+granularity, and show missing/unknown buckets with hatching. Interactive values
+have accessible names and visible feedback when activated, plus a history table.
+
+Monitor detail's incident section uses the API's global cursor pages, explicitly
+labels pages without matching incidents, and supports moving through older pages.
+Historical transport reasons absent from persistence are not invented. Receipt
+absence is unconfirmed delivery. This does not change incident or receipt retention.
+
+### Review corrections supplied
+
+WP05-R1/R2/R3 now have [implementation/regression evidence](../agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18), pending independent re-review. Live displays
+update in place while range/heartbeat controls retain focus. Unsaved settings and
+modal forms remain intact. Relative history ranges use a server-anchored full
+window; the newest incident page and receipts refresh together, while older pages
+disclose a retained dated snapshot and offer same-page refresh. Failed reads show
+stale snapshots explicitly. The original freshness requirements above remain the
+acceptance criteria.

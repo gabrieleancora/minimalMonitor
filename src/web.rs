@@ -79,7 +79,13 @@ fn router(storage: StorageClient) -> Router {
         .layer(middleware::from_fn(boundary))
 }
 
-async fn ready(State(storage): State<StorageClient>) -> Response {
+async fn ready(
+    State(storage): State<StorageClient>,
+    scheduler: Option<axum::Extension<crate::scheduler::SchedulerHealth>>,
+) -> Response {
+    if scheduler.is_some_and(|h| !crate::auth::now_ms().is_ok_and(|now| h.ready(now))) {
+        return failure(StatusCode::SERVICE_UNAVAILABLE, "scheduler_degraded");
+    }
     match storage.health().await {
         Ok(health) if health.writable => Json(HealthBody { status: "ready" }).into_response(),
         Ok(_) => failure(StatusCode::SERVICE_UNAVAILABLE, Error::DiskPressure.code()),
@@ -159,6 +165,43 @@ pub async fn serve(
     let routes = crate::web_security::router(auth, origin, mode, trusted_proxy)
         .layer(DefaultBodyLimit::max(BODY_BYTES))
         .layer(middleware::from_fn(boundary));
+    serve_routes(listener, routes, shutdown).await
+}
+pub async fn serve_monitoring(
+    listener: TcpListener,
+    auth: crate::auth::Auth,
+    config: &crate::config::Config,
+    health: crate::scheduler::SchedulerHealth,
+    shutdown: impl Future<Output = ()>,
+) -> Result<()> {
+    let sender_health = crate::notifications::SenderHealth {
+        token_present: config.telegram_token.is_some(),
+        ..Default::default()
+    };
+    serve_backend(listener, auth, config, health, sender_health, shutdown).await
+}
+pub async fn serve_backend(
+    listener: TcpListener,
+    auth: crate::auth::Auth,
+    config: &crate::config::Config,
+    health: crate::scheduler::SchedulerHealth,
+    sender_health: crate::notifications::SenderHealth,
+    shutdown: impl Future<Output = ()>,
+) -> Result<()> {
+    let monitoring = crate::web_monitoring::router(auth.storage.clone(), health.clone()).merge(
+        crate::web_notifications::router(auth.storage.clone(), sender_health.clone()),
+    );
+    let routes = crate::web_security::extended_router(
+        auth,
+        &config.public_origin,
+        config.mode,
+        config.trusted_proxy,
+        monitoring,
+    )
+    .layer(axum::Extension(health))
+    .layer(axum::Extension(sender_health))
+    .layer(DefaultBodyLimit::max(BODY_BYTES))
+    .layer(middleware::from_fn(boundary));
     serve_routes(listener, routes, shutdown).await
 }
 async fn serve_routes(

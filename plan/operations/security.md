@@ -112,6 +112,16 @@ rebinding, redirects and verified TLS must additionally be tested at that bounda
 
 ## D-21 all-TCP grant extension for WP-03
 
+The current WP-03 transports resolve once, reject entire sets over eight, validate
+all answers before family selection, then attempt only numeric capability
+addresses. Auto uses at most two sequential attempts within a shared deadline.
+HTTP/TLS do not follow redirects, use environment proxies, retry automatically,
+download bodies, store cookies or decompress. Original Host/path/TLS name are
+preserved. Optional operator-only `extra_trust_roots` accepts up to 16 DER files
+(16 KiB each, 128 KiB total); verification cannot be disabled. Native ping requires
+neither raw sockets nor shell commands. Live controlled transport, hostname/TLS,
+whole-set/fallback and narrow-group evidence is in [WP-03](../agents/reports/WP-03.md).
+
 Owner-authorized production grants are `192.168.1.0/24` and `10.172.73.1/32`,
 all TCP ports and ping in both. Add an explicit `all_tcp_ports` boolean, default
 false, to the rule schema. When true it permits ports 1–65535 for HTTP/HTTPS/TCP;
@@ -120,7 +130,7 @@ nonzero ports. Reject conflicting nonempty `ports` plus `all_tcp_ports=true`.
 An empty port list by itself grants no TCP access; `ping` remains independent.
 At least one of an explicit port, all-TCP permission or ping must be enabled.
 
-This is a planned extension, not supported by the completed WP-02 binary. Keep
+WP-03 implements this extension; the historical WP-02 binary does not. Keep
 the 64-rule cap and constant-size all-TCP representation. Do not enumerate every
 port, change WireGuard/Nginx or auto-enable private ranges. Existing metadata,
 network/broadcast, mixed-DNS and exact-loopback checks take precedence. Preserve
@@ -133,6 +143,21 @@ rejection, independent ping permission and hard denials under all-TCP grants.
 Use automatic HTML escaping, no rendering target data as HTML, parameterized SQL and a restrictive CSP (`self` assets, no framing, no objects, no unsafe inline script). Add no-sniff, a restrictive referrer policy and `Cache-Control: no-store` for authenticated HTML/API data. All resources are local except server-side Telegram/target connections.
 
 Telegram token lives in a service-readable secret file with restrictive permissions; session and password material never appear in logs or API responses. SQLite contains hashes and operational data, and remains sensitive even without the bot token. Redact outgoing URL query strings, tokens in Telegram paths, cookies, credentials and raw network errors. Backup access is restricted to the operator.
+
+WP-04 reads optional `telegram_token_file` during bounded configuration loading,
+with no application state creation. It requires a regular nonsymlink file, at
+most 256 bytes, valid token syntax and private Unix permissions. Provision it
+outside the repository; Windows ACL restriction remains an operator obligation.
+The credential has no Debug/Serialize implementation and its owning buffer is
+zeroized. Only its hash fingerprint is persisted to detect changes; neither hash
+nor token reaches private/public JSON. Browser settings accept only revisions,
+enablement and a signed chat ID. Secret changes cancel/audit old queued jobs.
+The official API hostname, HTTPS port and public roots are fixed in code,
+independent of target grants and custom probe roots. The whole DNS set must be
+public and at most eight answers; pre-POST numeric fallback is capped at two.
+No proxy environment, redirects, raw error/description reporting or incoming bot
+commands are introduced. All notification routes share existing authentication,
+Origin/CSRF, body/deadline and response-size guards.
 
 ## Host and proxy requirements
 

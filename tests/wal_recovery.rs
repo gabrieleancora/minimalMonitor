@@ -15,6 +15,9 @@ async fn pinned_wal_pressure_recovers_on_the_same_worker_without_restart() {
         .unwrap();
     let client = storage.client();
     assert!(client.health().await.unwrap().writable);
+    let monitor_config = || {
+        serde_json::from_str::<minimalmonitor::monitoring::MonitorConfig>(r#"{"name":"WAL fixture","kind":"tcp","target":"fixture.invalid","port":443,"enabled":false}"#).unwrap()
+    };
 
     // Controlled, bounded fixture connections stand in for a long read and
     // committed writes. WP-02 account mutations use the real worker admission.
@@ -65,6 +68,18 @@ async fn pinned_wal_pressure_recovers_on_the_same_worker_without_restart() {
         assert!(health.disk_warning);
         assert!(matches!(
             client
+                .monitoring(minimalmonitor::storage::monitoring::Operation::Create {
+                    config: monitor_config(),
+                    now: minimalmonitor::auth::now_ms().unwrap(),
+                    jitter_ms: 0,
+                    key: None
+                })
+                .await,
+            Err(Error::DiskPressure)
+        ));
+        assert!(client.monitors().await.unwrap().is_empty());
+        assert!(matches!(
+            client
                 .security(Operation::Local {
                     user: "fixture".into(),
                     hash: "noncredential-fixture".into(),
@@ -102,6 +117,16 @@ async fn pinned_wal_pressure_recovers_on_the_same_worker_without_restart() {
 
     // No Storage restart or connection replacement: this same client recovers.
     assert!(client.health().await.unwrap().writable);
+    client
+        .monitoring(minimalmonitor::storage::monitoring::Operation::Create {
+            config: monitor_config(),
+            now: minimalmonitor::auth::now_ms().unwrap(),
+            jitter_ms: 0,
+            key: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(client.monitors().await.unwrap().len(), 1);
     client
         .security(Operation::Local {
             user: "fixture".into(),

@@ -1,6 +1,17 @@
 # Data model and persistence
 
-This document remains the logical contract. WP-01 adds [foundation migration 1](../../migrations/0001_foundation.sql) outside `plan`; its [report](../agents/reports/WP-01.md) records executable schema and migration evidence. WP-02 implements transactional account/session mutations and bounded security audit metadata on the same worker, without changing the schema; see its [report](../agents/reports/WP-02.md) and [security contract](../operations/security.md). Monitoring retention, aggregation and notifications remain WP-03/WP-04. Use UTC timestamps, monotonic clocks for in-process elapsed time, parameterized SQL, explicit constraints and versioned migrations.
+This document remains the logical contract. WP-01 adds [foundation migration 1](../../migrations/0001_foundation.sql) outside `plan`; its [report](../agents/reports/WP-01.md) records executable schema and migration evidence. WP-02 implements transactional account/session mutations and bounded security audit metadata on the same worker, without changing the schema; see its [report](../agents/reports/WP-02.md) and [security contract](../operations/security.md). WP-03 adds [migration 2](../../migrations/0002_monitoring.sql), cadence/state/coverage, bounded retention and incident/outbox transitions. Telegram delivery remains WP-04. Use UTC timestamps, monotonic clocks for in-process elapsed time, parameterized SQL, explicit constraints and versioned migrations.
+
+WP-04 adds [migration 4](../../migrations/0004_notifications.sql) and the bounded
+`telegram_state` singleton: credential fingerprint (never the token), bot-wide
+cooldown, destination pacing, test-action limit, permanent-error latch, request/
+acknowledgement sequence and suppression cursor. Outbox terminal timestamps and
+safe error categories support seven days after completion and at most 2000
+terminal receipts. A receipt bit on each incident remembers delivered down
+alerts after receipt cleanup; long incidents cannot acquire false nondelivery
+claims on recovery. A credential change/removal/provisioning cancels prior queued
+destinations, advances revisions and audits the change without clearing cooldown.
+Migration uses the existing supported snapshot/preflight rules.
 
 ## Entities
 
@@ -10,6 +21,7 @@ This document remains the logical contract. WP-01 adds [foundation migration 1](
 | `admin` | Single row; normalized username, Argon2id password hash, credential generation, timestamps |
 | `sessions` | Hash of opaque random token, admin ID, CSRF token binding, created/last-used/absolute-expiry times; max five active sessions |
 | `monitors` | ID, name, type, validated target fields, interval/deadline, failure threshold, enabled/alerts flags, address family, revision |
+| `monitor_identity_allocator` | Migration 3 singleton; durable decreasing sequence for newly allocated negative monitor IDs; legacy positive IDs remain unchanged |
 | `schedule_epochs` | Monitor/revision, anchor, normal interval, cadence mode/next due slot, enabled start/end, coverage discontinuities; enough data to reconstruct expected normal and confirmation slots |
 | `monitor_state` | One row per monitor: status, failure streak, last due/completed time, last result/error, active incident ID |
 | `probe_results` | Monitor/revision, scheduled slot, observed time, outcome, elapsed milliseconds, status code, bounded error category; unique monitor/revision/slot |
@@ -23,11 +35,65 @@ This document remains the logical contract. WP-01 adds [foundation migration 1](
 
 WP-04 must persist Telegram's bot-wide rate-limit not-before timestamp in bounded singleton state, as well as each event's retry/expiry state; restarts must not bypass a provider cooldown (D-22). Optional v2 Bark provider outcomes and incident recovery routing are described in the [future fallback contract](bark-fallback.md); no Bark schema or generalized provider framework is required for WP-04.
 
+WP-04 implements this singleton and preserves it on restart. Claim reserves one
+durable request sequence and bounded event/attempt references; Finish is
+idempotent for that sequence, including canceled/pruned in-flight jobs. A canceled
+old destination's 429 still gates the bot, while its permanent chat failure cannot
+disable a replacement destination. Interrupted sending jobs return to pending
+with a 60-second restart wait, preserving expiry and attempt bounds. Actual send
+outcomes acknowledge the durable sequence once. A settings change cannot retract
+an already submitted request; its captured destination never changes mid-flight.
+
+For WP04-R1, one in-memory permit records an uncertain **unsubmitted** claim.
+A worker-ordered reconciliation transaction refunds the unsent reservation only
+on still-sending rows, expires rows at their original deadline, and acknowledges
+the outstanding sequence. It never revives canceled/terminal jobs or resets
+cooldown/pacing, destination revisions, due times or incident ordering. The
+sequence acknowledgement makes repeated reconciliation idempotent after a lost
+reply. A lost claim/reconciliation reply keeps admission and degraded health
+until the same sender receives confirmation; no process restart or new schema is
+needed. This operation is never applied to a transport outcome awaiting Finish.
+
 Foreign keys apply consistently. Index probe results by monitor/time, incidents by monitor/confirmation time, sessions by token hash and expiry, and pending notifications by state/next-attempt time. Delete monitor-owned history in bounded batches after disabling its schedule and canceling queued notifications; hide the tombstoned monitor immediately. No uncontrolled cascade through years of data in an interactive request.
 
 An idempotency key reused with a different request digest is a conflict. A matching retry returns the already committed result without a second mutation. Evicted or expired keys provide no deduplication guarantee; clients must not automatically retry a create beyond that window.
 
+The [WP03-R2 correction](../agents/reports/WP-03.md#review-corrections-2026-10-13)
+adds [migration 3](../../migrations/0003_monitor_identity.sql). Monitor IDs are
+opaque signed integers and are never reissued by the service within the persisted
+database. The earlier service generated positive SQLite IDs; newly created
+monitors use a separate negative namespace and a durable sequence, preserving
+even deleted legacy identities whose maximum is no longer recorded. Migration
+preserves live IDs/FKs and seeds below existing negative references if any.
+Allocation and creation commit together; deletion and retention never reset the
+singleton. Retained create keys still reference the original ID; deletion makes
+replay conflict, while stale mutations return not found. Key bounds remain
+100 rows/24 hours. Sequence exhaustion fails closed without reusing an ID.
+
 ## Transactions and worker behavior
+
+WP-03 migration 2 adds current `epoch_id`, `next_due_ms`, cadence, first failure,
+compact last result and a separate system-error category to monitor state. The
+result key includes the schedule epoch, so reanchors cannot overwrite earlier
+physical observations. Legacy foundation results use epoch zero. Preconfigured
+foundation monitors start enabled coverage at migration time; no old scheduler
+existed from which to infer missing observations.
+
+Each slot immediately and transactionally updates hourly counts; missed slots
+advance the durable cursor in chunks of at most 500, returning to normal cadence
+after the first missed confirmation. Unknown recent slots retain explicit raw
+records for exact seven-day window boundaries. Older history sums hourly buckets
+and labels partial boundaries. Retention never deletes raw rows before their
+hourly counts commit. A singleton with trigger-maintained row counters enforces
+raw/hourly/epoch caps without per-probe history scans. Pressure rejects writes;
+it never deletes young incidents. Tombstones hide immediately and clean up in
+dependency order with the same 500-row allowance.
+
+Down/recovery transitions insert compact, unique outbox references only when
+global delivery and monitor alerts are enabled. Pending row/content overflow
+increments `dropped_alerts` in the same incident transaction. API summary exposes
+that counter and persisted/local persistence faults. Delivery, digests, retry
+and suppression-summary processing remain WP-04.
 
 WP-02 account/session operations share the existing 128-command worker channel
 and execution/reply deadlines. Account reads are single-row; each mutation
@@ -60,7 +126,7 @@ WP-01 maintenance first checkpoints PASSIVE. If the allocated WAL remains at lea
 | Data | Proposed retention / bound |
 | --- | --- |
 | Raw probe results | Seven days; at most 1,010,000 rows globally |
-| Hourly aggregates | 90 days; at most 108,000 monitor/hour rows |
+| Hourly aggregates | 90 days; at most 108,050 monitor/hour rows including 50 partial boundary hours (D-23) |
 | Incidents | 180 days (confirmed D-10); retain current open incidents. No incident row-count cap (confirmed D-18); existing database/disk-pressure safeguards apply. |
 | Schedule epochs | 90 days plus the epoch covering the earliest retained boundary; cap 10,000 rows |
 | Audit events | 30 days or 5000 rows, whichever is smaller |

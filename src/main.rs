@@ -24,7 +24,7 @@ fn entry() -> Result<()> {
     let command = args.next().ok_or(Error::Configuration)?;
     if command == "--version" && args.next().is_none() {
         println!(
-            "minimalmonitor {} (WP-02 security; SQLite {})",
+            "minimalmonitor {} (WP-04 notifications; SQLite {})",
             env!("CARGO_PKG_VERSION"),
             rusqlite::version()
         );
@@ -46,7 +46,8 @@ fn entry() -> Result<()> {
     let owner = StateOwner::acquire(&config.state_dir)?;
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
-        .max_blocking_threads(2)
+        // Four probe calls, one sender DNS, one hash and one shutdown helper.
+        .max_blocking_threads(7)
         .enable_all()
         .build()
         .map_err(|_| Error::WorkerStopped)?;
@@ -80,20 +81,71 @@ async fn run(
     local: Option<(String, zeroize::Zeroizing<String>, bool)>,
 ) -> Result<()> {
     let storage = Storage::start(owner).await?;
-    let outcome = match Auth::new(storage.client(), WorkBounds::default()).await {
+    let bounds = WorkBounds::default();
+    let outcome = match Auth::new(storage.client(), bounds.clone()).await {
         Ok(auth) => match local {
             Some((user, password, reset)) => auth.local_account(user, password, reset).await,
             None => match tokio::net::TcpListener::bind(config.listen).await {
                 Ok(listener) => {
-                    web::serve(
-                        listener,
-                        auth,
-                        &config.public_origin,
-                        config.mode,
-                        config.trusted_proxy,
-                        shutdown_signal(),
-                    )
-                    .await
+                    match minimalmonitor::probes::Probes::new(
+                        config.destination_policy.clone(),
+                        bounds.clone(),
+                        config.extra_trust_roots.clone(),
+                    ) {
+                        Ok(probes) => {
+                            let health = minimalmonitor::scheduler::SchedulerHealth::default();
+                            let sender_health = minimalmonitor::notifications::SenderHealth {
+                                token_present: config.telegram_token.is_some(),
+                                ..Default::default()
+                            };
+                            let sender = minimalmonitor::notifications::Sender::new(
+                                storage.client(),
+                                minimalmonitor::notifications::Telegram::new(
+                                    config.telegram_token.clone(),
+                                ),
+                                bounds,
+                                sender_health.clone(),
+                                &config.public_origin,
+                            );
+                            sender
+                                .initialize(
+                                    config.telegram_token.as_ref().map(|t| t.fingerprint()),
+                                    minimalmonitor::auth::now_ms()?,
+                                )
+                                .await?;
+                            let (stop, receive) = tokio::sync::oneshot::channel();
+                            let (sender_stop, sender_receive) = tokio::sync::oneshot::channel();
+                            let notification = sender.run(async {
+                                let _ = sender_receive.await;
+                            });
+                            tokio::pin!(notification);
+                            let scheduler = minimalmonitor::scheduler::run(
+                                storage.client(),
+                                probes,
+                                health.clone(),
+                                async {
+                                    let _ = receive.await;
+                                },
+                            );
+                            tokio::pin!(scheduler);
+                            tokio::select! {
+                                result=web::serve_backend(listener,auth,&config,health,sender_health,shutdown_signal())=>{
+                                    let _=stop.send(());
+                                    let _=sender_stop.send(());
+                                    result.and(scheduler.await).and(notification.await)
+                                }
+                                result=&mut scheduler=>{
+                                    let _=sender_stop.send(());
+                                    result.and(notification.await).and(Err(Error::WorkerStopped))
+                                },
+                                result=&mut notification=>{
+                                    let _=stop.send(());
+                                    result.and(scheduler.await).and(Err(Error::WorkerStopped))
+                                },
+                            }
+                        }
+                        Err(e) => Err(e),
+                    }
                 }
                 Err(_) => Err(Error::Io),
             },

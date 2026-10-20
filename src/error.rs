@@ -18,6 +18,7 @@ pub enum Error {
     Unauthorized,
     Forbidden,
     Conflict,
+    NotFound,
     RateLimited,
 }
 
@@ -40,6 +41,7 @@ impl Error {
             Self::Unauthorized => "authentication_required",
             Self::Forbidden => "forbidden",
             Self::Conflict => "conflict",
+            Self::NotFound => "not_found",
             Self::RateLimited => "rate_limited",
         }
     }

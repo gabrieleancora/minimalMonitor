@@ -76,6 +76,125 @@ Repeatable runners and summaries live under [validation/wp02](../../validation/w
 The full 256 MiB incremental RAM/2 GiB disk envelope, Nginx and WireGuard release
 gates remain unchanged and unqualified by these bounded security tests.
 
+## WP-03 monitoring evidence
+
+Review gate closed (2026-10-14): [WP03-R1/R2 re-review](../agents/reports/WP-03-review.md#re-review-and-closure-2026-10-14) confirms the corrections with independent formatting/clippy and 60 Windows/62 Fedora passing tests. WP-03 is accepted for its scoped handoff; WP-04 is ready for separate assignment. Full release qualification remains outstanding.
+
+Correction regressions exercise actual 1,010,000 raw rows and 10,000 epochs,
+without modifying admission counters: eligible data must be reclaimed in bounded
+transactions during restart/clock-jump recovery, then unknown catch-up and probes
+resume. Open and young closed incidents survive; young non-reclaimable pressure
+must remain degraded without probes or invented coverage. Monitor identity must
+survive deletion/cleanup/restart and version-2 migration: an old create key must
+not return a replacement and stale edit/delete must leave it unchanged. Migration
+3 uses one durable signed-ID allocator while preserving existing IDs, supported
+snapshots and the 100-key/24-hour bound. Five integration regressions and the
+version-2 upgrade regression pass on both platforms; final suites have 60 Windows
+and 62 Fedora passes, with the Linux namespace-only permission test separately
+passed. These are correctness fixtures, not production resource qualification.
+
+[WP-03](../agents/reports/WP-03.md) supplies scoped V-04/V-05/V-06/V-09 evidence:
+Windows/Fedora formatting, warning-denied clippy, locked tests, release execution,
+account/ownership regression and migration 1-to-2 with a supported recovery
+snapshot. Controlled transports cover HTTP/HTTPS wire-header boundaries/shapes,
+Host/path/TLS name, trusted/untrusted/wrong-name/expired certificates, redirect
+suppression/no body consumption, numeric fallback, whole DNS-set rejection,
+private/mapped/metadata denials and native v4/v6 ping. Isolated Fedora permission
+denial must be unknown; narrow one-group permission with zero capabilities passes.
+
+State/storage tests cover exact D-19 timing, one incident/down/recovery pair,
+duplicate submissions, 20 stale revisions, restart/missed-confirmation normal
+coverage, pause exclusion, local faults, clock epochs, exact percentage examples,
+idempotency/admission, transactional rollback, outbox suppression, age-based
+retention beyond 10,000 recent incidents, open-incident preservation, <=500-row
+cleanup and real WAL pressure/recovery on monitoring writes. A controlled-clock
+15-monitor runtime test verifies synchronized confirmations/recovery with <=4
+probes; it is not a p99 scheduling benchmark or a 24-hour soak.
+
+D-23 permits at most 108,050 hourly rows, including 50 partial boundary hours,
+without reducing 90-day retention. Full V-07/V-08 resource, Debian-compatible
+V-01/V-09, GUI, Telegram and production integration gates remain outstanding.
+
+## WP-04 notification evidence
+
+The [WP-04 report](../agents/reports/WP-04.md) records implementation, exact
+platform commands/results and any unavailable evidence.
+
+Review gate closed (2026-10-18): [WP04-R1 re-review](../agents/reports/WP-04-review.md#re-review-and-closure-2026-10-18) confirms recovery from a committed claim whose reply is lost. Independent formatting/clippy and 91 Windows/93 Fedora tests pass, including all four new regressions. WP-04 is accepted for scoped handoff; full release qualification remains outstanding.
+
+Correction supplied (2026-10-18): [implementation evidence](../agents/reports/WP-04.md#wp04-r1-correction-2026-10-18)
+passes four deterministic post-commit reply-loss cases and full 91 Windows/93
+Fedora tests, formatting, clippy, release/lifecycle and Linux interactive checks.
+The running sender retains admission/degraded health until worker-ordered,
+idempotent reconciliation confirms the unsent reservation is released. Cases
+include a lost reconciliation reply, expiry/tenth-attempt limits, destination
+cancellation and preserved provider cooldown. Existing failed-Finish/WAL and
+restart-duplicate regressions still pass. Independent re-review confirms the correction.
+
+Current recorded implementation evidence on Windows and actual Fedora includes:
+91 Windows/93 Fedora passing tests, formatting, warning-denied clippy, release
+build/execution and lifecycle checks, plus Linux interactive account/session
+checks. The ordinary Fedora suite skips one existing namespace-only ping
+permission regression; it was not rerun separately for WP-04. Controlled backend
+evidence does not close the full release gates below.
+
+Scoped V-11/V-04/V-06 requires controlled fixtures for:
+
+- Atomic incident/event snapshots, five-second coalescing at 15 monitors,
+  dated down/recovery ordering, resolved-pair receipts and explicit earlier-alert
+  nondelivery. Down-delivery evidence must survive seven-day receipt cleanup.
+- Exact completion-plus-60-second transient retries, ten actual/admitted attempt
+  bounds and six-hour expiry. Cooldown/pacing waits consume no attempts. A long
+  429 wait gates new alerts, retries and tests across restart; shorter waits use
+  the 60-second floor, and numeric overflow must never permit an early send.
+- Persistent permanent-error stop, corrective revisions/secret changes, durable
+  once-per-minute tests, cancellation/audit without queued-destination redirection,
+  and the unavoidable already-submitted request window.
+- Interrupted remote acceptance/restart with stable logical identity and possible
+  duplicate delivery. A temporary acknowledgement-storage failure must keep one
+  bounded receipt and resume acknowledgement without another request on the same
+  sender after storage recovery. Exercise actual pinned WAL pressure.
+- A committed claim whose reply times out or is lost must recover on the same
+  sender without a permanently outstanding request. Inject this separately from
+  a failed acknowledgement; verify visible degradation until reconciliation,
+  bounded state, preserved ordering/cooldowns and resumed subsequent delivery.
+- Both 1000-row and 2 MiB pending bounds with incidents preserved, dated suppression
+  summary/counters, terminal retention of seven days and at most 2000 rows,
+  migration-3 upgrade preservation and a supported recovery snapshot.
+- Fixed official-origin HTTPS and verified root/name, numeric fallback before
+  POST only, whole DNS-set public-policy validation, no redirects/environment
+  proxy, bounded response headers/body and total deadline, plain text/disabled
+  previews, safe error categories and no target/query/token leakage. An observed
+  429 whose body stalls must preserve its known provider wait.
+- Real protected routes: authentication, Origin/CSRF, input/duplicate-field
+  validation, stale revisions, signed chat-ID precision, test throttling,
+  bounded pagination/no-store/redacted output and separate summary delivery health.
+
+These controlled tests do not prove live channel posting permission, provider
+delivery, full GUI visibility, Debian 12 compatibility, 24-hour resources or
+production Nginx/WireGuard integration. Those remain release gates. Production
+tokens must be provisioned out of the repository; no real channel messages are
+required to exercise a controlled backend fixture.
+
+## WP-05 GUI evidence
+
+Owner-assigned WP-05 implementation and scoped V-02/V-03/V-06 evidence are in the
+[handoff](../agents/reports/WP-05.md) and [review index](../../validation/wp05/README.md).
+Review gate (2026-10-18): [WP05-R1/R2/R3](../agents/reports/WP-05-review.md) require live main-pane status/health while controls retain focus, full valid 90-day history after delayed summary use, and newest-incident/recovery/receipt updates across successive polls. [Corrections and regression evidence](../agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18) are supplied, pending independent re-review. Preserve unsaved forms, keyboard focus, older-page selection, hidden-tab suspension and bounded requests. The focused suite uses the real protected history/incident APIs, controlled SQLite fixtures and browser timer/visibility advancement; server retention and response bounds remain enforced.
+
+Windows/Fedora formatting, warning-denied clippy, full tests, release build and
+controlled lifecycle checks pass. The new regression verifies public nonsensitive
+assets, private page shells and a bounded 50-monitor/600-observation summary.
+
+The real Rust HTTP/auth/SQLite browser fixture runs no probes or Telegram sender.
+Browser evidence covers responsive 360 px/desktop screens, themes/system changes,
+forms, keyboard dialogs, charts/tables, safe hostile names, revisions, actual
+pause/resume/delete/account/Telegram APIs, stale/empty/session/error states and
+measured theme/control contrast. Explicitly injected server/network faults are
+identified in the evidence. These checks are not a complete WCAG certification,
+screen-reader review, cross-browser qualification, live Telegram proof, Debian 12
+qualification or V-07/V-08 resource soak. Independent release review remains.
+
 ## Concrete behavioral cases
 
 - D-14 production qualification must execute the release on Debian 12 x86_64

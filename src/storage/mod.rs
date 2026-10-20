@@ -1,4 +1,6 @@
 mod migrations;
+pub mod monitoring;
+pub mod notifications;
 pub mod security;
 
 use rusqlite::Connection;
@@ -32,6 +34,8 @@ struct Command {
 enum Work {
     Health(Command),
     Security(security::Command),
+    Monitoring(monitoring::Command),
+    Notifications(notifications::Command),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -44,6 +48,8 @@ pub struct StorageHealth {
 pub struct StorageClient {
     tx: SyncSender<Work>,
     stopping: Arc<AtomicBool>,
+    #[cfg(test)]
+    claim_reply_fault: Arc<std::sync::Mutex<Option<notifications::ClaimReplyFault>>>,
 }
 
 pub struct Storage {
@@ -90,6 +96,14 @@ impl Storage {
                                 security::dispatch(&mut connection, root, command);
                                 continue;
                             }
+                            Work::Monitoring(command) => {
+                                monitoring::dispatch(&mut connection, root, command);
+                                continue;
+                            }
+                            Work::Notifications(command) => {
+                                notifications::dispatch(&mut connection, root, command);
+                                continue;
+                            }
                         };
                         if command.reply.is_closed() {
                             continue;
@@ -125,7 +139,12 @@ impl Storage {
             .map_err(|_| Error::WorkerStopped)?;
         match ready_rx.await {
             Ok(Ok(())) => Ok(Self {
-                client: StorageClient { tx, stopping },
+                client: StorageClient {
+                    tx,
+                    stopping,
+                    #[cfg(test)]
+                    claim_reply_fault: Arc::default(),
+                },
                 worker: Some(worker),
             }),
             result => {
@@ -362,7 +381,7 @@ mod tests {
             db.query_row("SELECT count(*) FROM schema_versions", [], |r| r
                 .get::<_, i64>(0))
                 .unwrap(),
-            1
+            migrations::MIGRATIONS.len() as i64
         );
         assert_eq!(
             db.query_row("SELECT count(*) FROM admin", [], |r| r.get::<_, i64>(0))

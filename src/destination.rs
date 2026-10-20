@@ -14,14 +14,19 @@ pub struct Rule {
     #[serde(default)]
     pub ports: Vec<u16>,
     #[serde(default)]
+    pub all_tcp_ports: bool,
+    #[serde(default)]
     pub ping: bool,
 }
+#[derive(Clone)]
 struct Grant {
     network: IpNet,
     host: Option<String>,
     ports: Vec<u16>,
+    all_tcp_ports: bool,
     ping: bool,
 }
+#[derive(Clone)]
 pub struct Policy {
     grants: Vec<Grant>,
 }
@@ -226,7 +231,8 @@ impl Policy {
             if matches!(network,IpNet::V6(n) if n.addr().to_ipv4_mapped().is_some())
                 || rule.ports.len() > 64
                 || rule.ports.contains(&0)
-                || (rule.ports.is_empty() && !rule.ping)
+                || (rule.all_tcp_ports && !rule.ports.is_empty())
+                || (rule.ports.is_empty() && !rule.all_tcp_ports && !rule.ping)
             {
                 return Err(Error::Configuration);
             }
@@ -244,6 +250,7 @@ impl Policy {
                 network,
                 host,
                 ports: rule.ports,
+                all_tcp_ports: rule.all_tcp_ports,
                 ping: rule.ping,
             });
         }
@@ -265,7 +272,7 @@ impl Policy {
                         && (!matches!(class(ip), Class::Loopback)
                             || r.network.prefix_len() == if ip.is_ipv4() { 32 } else { 128 })
                         && r.host.as_ref().is_none_or(|host| host == target.host())
-                        && target.port.map(|p| r.ports.contains(&p)).unwrap_or(r.ping)
+                        && target.port.map(|p| r.all_tcp_ports || r.ports.contains(&p)).unwrap_or(r.ping)
                 }),
             };
             if !allowed {
@@ -312,6 +319,71 @@ mod tests {
         text.iter().map(|s| s.parse().unwrap()).collect()
     }
     #[test]
+    fn all_tcp_grants_are_compact_independent_and_preserve_hard_denials() {
+        let make = |cidr: &str, ping| Rule {
+            cidr: cidr.into(),
+            host: None,
+            ports: vec![],
+            all_tcp_ports: true,
+            ping,
+        };
+        let policy = Policy::new(vec![
+            make("192.168.1.0/24", true),
+            make("10.172.73.1/32", true),
+        ])
+        .unwrap();
+        for host in ["192.168.1.1", "192.168.1.254", "10.172.73.1"] {
+            for port in [1, 65535] {
+                assert!(
+                    policy
+                        .authorize(&Target::tcp(host, port).unwrap(), &ips(&[host]))
+                        .is_ok()
+                );
+            }
+            assert!(
+                policy
+                    .authorize(&Target::ping(host).unwrap(), &ips(&[host]))
+                    .is_ok()
+            );
+        }
+        for host in ["192.168.1.0", "192.168.1.255", "192.168.2.1", "10.172.73.2"] {
+            assert!(
+                policy
+                    .authorize(&Target::tcp(host, 1).unwrap(), &ips(&[host]))
+                    .is_err()
+            );
+        }
+        let no_ping = Policy::new(vec![make("192.168.1.0/24", false)]).unwrap();
+        assert!(
+            no_ping
+                .authorize(
+                    &Target::ping("192.168.1.1").unwrap(),
+                    &ips(&["192.168.1.1"])
+                )
+                .is_err()
+        );
+        let mut conflict = make("10.0.0.0/8", false);
+        conflict.ports.push(443);
+        assert!(Policy::new(vec![conflict]).is_err());
+        assert!(Target::tcp("192.168.1.1", 0).is_err());
+        for cidr in ["0.0.0.0/0", "::/0", "fd00:ec2::254/128"] {
+            let broad = Policy::new(vec![make(cidr, true)]).unwrap();
+            for forbidden in [
+                "169.254.169.254",
+                "fd00:ec2::254",
+                "100.100.100.200",
+                "168.63.129.16",
+                "::ffff:169.254.169.254",
+            ] {
+                assert!(
+                    broad
+                        .authorize(&Target::ping(forbidden).unwrap(), &ips(&[forbidden]))
+                        .is_err()
+                );
+            }
+        }
+    }
+    #[test]
     fn aws_ipv6_metadata_is_denied_before_any_grant() {
         let metadata = "fd00:ec2::254".parse::<IpAddr>().unwrap();
         let ordinary = "fd00:ec2::253".parse::<IpAddr>().unwrap();
@@ -321,6 +393,7 @@ mod tests {
                 cidr: cidr.into(),
                 host: None,
                 ports: vec![80, 443],
+                all_tcp_ports: false,
                 ping: true,
             }])
             .unwrap();
@@ -362,6 +435,7 @@ mod tests {
             cidr: "fd00::/8".into(),
             host: Some("metadata.invalid".into()),
             ports: vec![80],
+            all_tcp_ports: false,
             ping: true,
         }])
         .unwrap();
@@ -414,12 +488,14 @@ mod tests {
                 cidr: "10.1.0.0/24".into(),
                 host: Some("home.invalid".into()),
                 ports: vec![443],
+                all_tcp_ports: false,
                 ping: false,
             },
             Rule {
                 cidr: "127.0.0.1/32".into(),
                 host: None,
                 ports: vec![8080],
+                all_tcp_ports: false,
                 ping: true,
             },
         ])
@@ -462,6 +538,7 @@ mod tests {
                 cidr: "127.0.0.0/8".into(),
                 host: None,
                 ports: vec![80],
+                all_tcp_ports: false,
                 ping: false
             }])
             .is_err()
@@ -470,6 +547,7 @@ mod tests {
             cidr: "0.0.0.0/0".into(),
             host: None,
             ports: vec![80],
+            all_tcp_ports: false,
             ping: true,
         }])
         .unwrap();
@@ -485,12 +563,14 @@ mod tests {
                 cidr: "fd12::/64".into(),
                 host: None,
                 ports: vec![443],
+                all_tcp_ports: false,
                 ping: true,
             },
             Rule {
                 cidr: "::1/128".into(),
                 host: None,
                 ports: vec![8080],
+                all_tcp_ports: false,
                 ping: true,
             },
         ])
@@ -518,6 +598,7 @@ mod tests {
                 cidr: "::ffff:10.0.0.0/120".into(),
                 host: None,
                 ports: vec![80],
+                all_tcp_ports: false,
                 ping: false
             }])
             .is_err()

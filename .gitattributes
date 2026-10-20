@@ -1,3 +1,5 @@
 feasibility/wp00/*.sh text eol=lf
 validation/wp01/*.sh text eol=lf
 validation/wp02/*.sh text eol=lf
+validation/wp03/*.sh text eol=lf
+validation/wp05/*.sh text eol=lf

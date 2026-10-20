@@ -1,6 +1,6 @@
 # Decisions and open questions
 
-Updated: 2026-10-11. "Proposed" is a planning baseline, not owner approval or a benchmark result.
+Updated: 2026-10-18. "Proposed" is a planning baseline, not owner approval or a benchmark result.
 
 ## Decision register
 
@@ -130,6 +130,59 @@ Planning scope: keep Bark in version two, as suggested by the owner; V2-01 remai
 
 The [Telegram contract](design/notifications.md) is authoritative for retry timing and bounds. The [Bark proposal](design/bark-fallback.md) defines a single optional endpoint/device, bounded best-effort fallback, separate provider outcomes and recovery routing. Those detailed v2 defaults are proposals, not owner-specified behavior or implemented features. Bark shares the home's failure domain and cannot replace an external watchdog. Existing RAM/disk limits remain unchanged; WP-03 and later packages are not started by this decision.
 
+## D-23: WP-03 implementation baseline (2026-10-12)
+
+Review status 2026-10-14: [WP03-R1/R2 re-review](agents/reports/WP-03-review.md#re-review-and-closure-2026-10-14) closes both findings after independent Windows/Fedora checks. WP-03 is accepted for its scoped handoff and WP-04 is ready for a separate owner assignment. The choices below remain relevant; these corrections add no feature scope or requirement relaxation.
+
+The owner assigned backend
+monitoring. The implementation adds the D-21 all-TCP flag, bounded numeric
+transports, persisted normal/confirmation cadence, epoch-safe results, incidents,
+sample availability/coverage, bounded cleanup and protected monitoring JSON APIs.
+The complete GUI and Telegram sender remain later assignments.
+
+The proposed hourly row ceiling is refined from 108,000 to **108,050**: a rolling
+90-day window can intersect 2161 hours, including a partial boundary hour, for
+each of at most 50 monitors. Retain that boundary hour until entirely expired;
+the fixed extra 50 rows avoid shortening the confirmed retention. This changes
+neither the firm disk/RAM envelope nor the incident policy. SQLite/worker caps
+remain enforced, and qualification still owes measured retained-history sizes.
+The data model and scoped acceptance are updated together.
+
+Runtime blocking helpers rise from two to six to accommodate four admitted
+native DNS/ICMP calls, one password hash and storage shutdown. Cancellation keeps
+probe admission until native work ends. A two-second wall/monotonic discrepancy
+creates an explicit schedule discontinuity. Seven-day raw windows are exact;
+older windows use summed hourly counts with partial boundaries labeled. Reports
+must distinguish controlled-clock scheduling tests from production latency/soak
+qualification and Fedora validation from Debian 12/glibc 2.36 compatibility.
+
+Automatic approval review rejected in-place source updates on the development
+host. Validation instead uses an isolated checkout beneath the documented
+development project, preserving its existing application source and shared
+toolchain. No production software or host-wide network policy changed.
+
+## D-23 review corrections (2026-10-13)
+
+The owner assigned the backend agent to address WP03-R1/R2. Recovery now performs
+a separately admitted, <=500-row retention transaction before every pending
+restart/clock-jump catch-up attempt. The same write-pressure gates and retention
+windows apply; non-reclaimable pressure remains degraded rather than bypassed.
+
+Migration 3 adds a constant-size durable monitor-ID allocator. The prior service
+allocated positive SQLite rowids, which can be reused after deleting the maximum;
+see [SQLite's rowid contract](https://www.sqlite.org/autoinc.html). Retained rows
+cannot reconstruct every deleted legacy maximum. Preserve all existing IDs/FKs
+and use a separate negative range with a persisted decreasing sequence for new
+monitors. This prevents both future reuse and collisions with deleted legacy IDs
+across migration, without an unbounded tombstone table or a changed request shape.
+IDs are opaque signed integers; API clients use the value returned by the server.
+Create-key limits remain 100/24 hours, and a key referencing a deleted monitor
+conflicts. Stale edit/delete requests cannot match a replacement.
+
+Data-model, monitoring and API contracts and the scoped acceptance evidence are
+updated with these corrections. No confirmed resource, incident-retention,
+confirmation-cadence, destination-policy or Telegram requirement changes.
+
 ## Questions awaiting owner input
 
 | Question | Interim assumption | Changes affected |
@@ -141,6 +194,82 @@ The [Telegram contract](design/notifications.md) is authoritative for retry timi
 | Which Telegram channel ID and bot credentials? | Channel destination confirmed; provision token through a secret file | WP-04/WP-06 setup, no credentials in planning reports |
 
 The owner answered the initial scope questions on 2026-10-06 and supplied production/cadence/network answers on 2026-10-11; those answers are incorporated above. Remaining inputs do not block separately assigned implementation against the confirmed contracts. Settle deployment-specific values before production qualification. Telegram token and destination chat are secrets/configuration to provision later, not information to request in planning chat.
+
+## D-24: WP-04 notification implementation (2026-10-14)
+
+Review status 2026-10-18: [WP04-R1 re-review](agents/reports/WP-04-review.md#re-review-and-closure-2026-10-18) closes the lost-claim-reply finding after independent Windows/Fedora checks. WP-04 is accepted for scoped handoff. The implementation choices below remain relevant; the correction preserves existing delivery requirements and does not add scope.
+
+Owner-assigned WP-04 uses the existing Hyper HTTP/1/rustls stack for fixed-origin
+Telegram sending rather than adding the proposed reqwest dependency. It retains
+verified public TLS, bounded headers/body/deadlines and whole-set public DNS
+policy with at most two numeric pre-POST connection attempts. The runtime adds
+one admitted sender DNS helper (seven blocking helpers total). Migration 4 adds
+durable provider cooldown/pacing, test throttling, permanent-error latch,
+credential-change detection, request acknowledgements, suppression cursor and
+terminal timestamps; incident down-delivery evidence survives terminal cleanup.
+The API represents chat IDs as canonical decimal strings on read and accepts
+validated strings or exact integer input. This implements full signed values
+without browser precision loss. See [notification contract](design/notifications.md)
+and [WP-04 report](agents/reports/WP-04.md) for evidence and outstanding gates.
+No confirmed retry, expiry, retention, resource or provider scope requirement is
+weakened. Bark, GUI, deployment and full release qualification remain unassigned.
+
+### WP04-R1 correction (2026-10-18)
+
+The sender retains its one notification permit after an uncertain claim reply
+and reconciles the known-unsubmitted reservation on the same serialized worker.
+Reconciliation refunds only unsent reservations, preserves terminal cancellation,
+expiry, ordering, pacing and provider cooldowns, and atomically acknowledges the
+request sequence. Retries are idempotent if reconciliation's reply is also lost.
+Known transport outcomes still use Finish and uncertain process restarts retain
+their existing duplicate/retry semantics. Health remains degraded until the
+running sender receives reconciliation confirmation. No dependency, migration,
+helper/queue limit or confirmed notification requirement changes. See the
+[worker correction report](agents/reports/WP-04.md#wp04-r1-correction-2026-10-18).
+
+## D-25: WP-05 GUI integration (2026-10-18)
+
+Review status: [WP05-R1/R2/R3](agents/reports/WP-05-review.md) leave acceptance pending live-view freshness and 90-day-range corrections. The implementation choices below remain relevant; these corrections enforce existing behavior without adding infrastructure or relaxing retention/security bounds.
+
+The owner assigned the GUI agent WP-05. Serve embedded, nonsensitive HTML/CSS/JS
+with system fonts and no frontend build/runtime dependency. The existing
+session/Origin/CSRF/CSP boundary protects all data and page routes. Theme startup
+runs synchronously from a local asset before CSS; localStorage failure falls
+back to system appearance for subsequent visits.
+
+The additive `recent` summary field supplies at most 12 chronological raw
+observations per current monitor (maximum 50), including explicit unknown slots,
+through indexed, bounded reads on the existing SQLite worker. It satisfies the
+existing single-summary-poll and heartbeat design together. No new endpoint,
+migration, worker, dependency or background probe path is introduced. The full
+summary remains capped at 256 KiB; the maximum-input regression exercises 50
+monitors and 12 observations each.
+
+History uses the agreed aggregated API, with hatched unknown/missing buckets,
+separate sample availability/coverage, timestamped keyboard controls and a table.
+Incident detail uses bounded global pages and explicitly discloses when this
+monitor has no incidents on the current page; receipt absence is unconfirmed
+delivery. The persisted API exposes closure reasons, not historical probe error
+categories, so the GUI does not invent historical failure detail. These are
+presentation details within the existing contract. No confirmed requirement or
+resource/retention/security bound is weakened. See [WP-05](agents/reports/WP-05.md).
+
+### WP05-R1/R2/R3 corrections supplied (2026-10-18)
+
+The GUI now reconciles bounded display trees by stable keys while preserving
+focus, expanded disclosures and unsaved forms. It does not suspend live main-pane
+updates based on focused controls. Newest incident/delivery pages poll on the
+existing cadence; older cursor pages explicitly retain a dated snapshot with
+same-page refresh. Both incident/receipt reads settle before releasing their
+single in-flight guard. No queue, worker, migration or dependency is added.
+
+R2 requires a small additive history query option: exclusive `range_ms`, anchored
+and validated against the same current server timestamp. Refreshing a summary
+first cannot eliminate network transit at an exact 90-day boundary; arbitrary
+client-side padding would omit retained history. Server anchoring preserves the
+full requested window, existing explicit-window behavior, 90-day retention,
+300-bucket and response-size bounds. See the [correction report](agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18).
+Independent re-review remains required; the initial findings are retained.
 
 ## Tradeoffs to preserve
 

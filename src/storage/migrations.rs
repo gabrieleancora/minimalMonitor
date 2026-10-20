@@ -15,10 +15,24 @@ use crate::{
 };
 
 pub(super) const APPLICATION_ID: i64 = 0x4d4d4f4e;
-pub(super) const MIGRATIONS: &[(&str, &str)] = &[(
-    "foundation",
-    include_str!("../../migrations/0001_foundation.sql"),
-)];
+pub(super) const MIGRATIONS: &[(&str, &str)] = &[
+    (
+        "foundation",
+        include_str!("../../migrations/0001_foundation.sql"),
+    ),
+    (
+        "monitoring",
+        include_str!("../../migrations/0002_monitoring.sql"),
+    ),
+    (
+        "monitor_identity",
+        include_str!("../../migrations/0003_monitor_identity.sql"),
+    ),
+    (
+        "notifications",
+        include_str!("../../migrations/0004_notifications.sql"),
+    ),
+];
 const RESERVED_BYTES: u64 = (128 + 64 + 800) * 1024 * 1024;
 
 /// Conservative worst case: database ceiling, WAL allowance, one recoverable
@@ -101,6 +115,37 @@ pub(super) fn inspect(connection: &Connection) -> Result<usize> {
         let tables: i64 = connection.query_row("SELECT count(*) FROM sqlite_schema WHERE type='table' AND name IN ('schema_versions','admin','sessions','monitors','schedule_epochs','monitor_state','probe_results','hourly_stats','incidents','notification_outbox','settings','request_keys','health_state','audit_events')", [], |r| r.get(0)).map_err(|_| Error::Schema)?;
         if tables != 14 {
             return Err(Error::Schema);
+        }
+        if version >= 2 {
+            let consistent:bool=connection.query_row("SELECT raw_rows=(SELECT count(*) FROM probe_results) AND hourly_rows=(SELECT count(*) FROM hourly_stats) AND epoch_rows=(SELECT count(*) FROM schedule_epochs) FROM monitoring_counts WHERE id=1",[],|r|r.get(0)).map_err(|_| Error::Schema)?;
+            if !consistent {
+                return Err(Error::Schema);
+            }
+            connection.prepare("SELECT epoch_id,next_due_ms,cadence,first_failure_ms,last_result_json,system_error FROM monitor_state LIMIT 0").map_err(|_| Error::Schema)?;
+            connection
+                .prepare("SELECT epoch_id FROM probe_results LIMIT 0")
+                .map_err(|_| Error::Schema)?;
+        }
+        if version >= 3 {
+            let valid:bool=connection.query_row("SELECT last_id<=min(0,coalesce((SELECT min(id) FROM monitors),0),coalesce((SELECT min(CAST(result_reference AS INTEGER)) FROM request_keys WHERE operation='monitor_create'),0)) FROM monitor_identity_allocator WHERE id=1",[],|r|r.get(0)).map_err(|_| Error::Schema)?;
+            if !valid {
+                return Err(Error::Schema);
+            }
+        }
+        if version >= 4 {
+            connection
+                .prepare("SELECT telegram_down_delivered FROM incidents LIMIT 0")
+                .map_err(|_| Error::Schema)?;
+            connection
+                .query_row(
+                    "SELECT cooldown_until_ms FROM telegram_state WHERE id=1",
+                    [],
+                    |r| r.get::<_, i64>(0),
+                )
+                .map_err(|_| Error::Schema)?;
+            connection
+                .prepare("SELECT terminal_at_ms,error_category FROM notification_outbox LIMIT 0")
+                .map_err(|_| Error::Schema)?;
         }
         for query in [
             "SELECT revision FROM settings WHERE id=1",
@@ -252,6 +297,159 @@ pub(super) fn directory_bytes(root: &Path) -> Result<u64> {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn identity_upgrade_reserves_deleted_legacy_ids_and_existing_replay_references() {
+        use crate::{
+            monitoring::MonitorConfig,
+            storage::{
+                Storage,
+                monitoring::{Operation, Value},
+            },
+        };
+        use sha2::Digest;
+        let dir = tempfile::tempdir().unwrap();
+        let owner = crate::ownership::StateOwner::acquire(&dir.path().join("state")).unwrap();
+        let root = owner.root().to_path_buf();
+        let path = root.join("monitor.db");
+        drop(private_file(&path).unwrap());
+        let mut db = Connection::open(&path).unwrap();
+        for (index, (name, sql)) in MIGRATIONS.iter().take(2).enumerate() {
+            apply(&mut db, index as i64 + 1, name, sql).unwrap();
+        }
+        db.execute(
+            "INSERT INTO admin VALUES(1,'fixture','noncredential-fixture',1,0,0)",
+            [],
+        )
+        .unwrap();
+        db.execute("INSERT INTO monitors(id,name,kind,target,port,interval_seconds,deadline_seconds,failure_threshold,enabled,alerts,address_family,revision) VALUES(10,'legacy','tcp','fixture.invalid',443,60,5,3,0,0,'auto',1)",[]).unwrap();
+        db.execute("INSERT INTO schedule_epochs(monitor_id,revision,anchor_at_ms,interval_seconds,enabled_start_ms,enabled_end_ms) VALUES(10,1,0,60,0,0)",[]).unwrap();
+        let epoch = db.last_insert_rowid();
+        db.execute("INSERT INTO monitor_state(monitor_id,status,failure_streak,epoch_id,next_due_ms) VALUES(10,'paused',0,?1,0)",[epoch]).unwrap();
+        let original:MonitorConfig=serde_json::from_str(r#"{"name":"deleted legacy","kind":"tcp","target":"fixture.invalid","port":443,"enabled":false}"#).unwrap();
+        let digest = sha2::Sha256::digest(serde_json::to_vec(&original).unwrap());
+        db.execute("INSERT INTO request_keys(admin_id,key,operation,request_digest,result_reference,created_at_ms) VALUES(1,'legacy-key','monitor_create',?1,'11',0)",[digest.as_slice()]).unwrap();
+        // ID 11 was the deleted highest ID, while only ID 10 remains live.
+        drop(db);
+        let storage = Storage::start(owner).await.unwrap();
+        let client = storage.client();
+        assert!(matches!(
+            client
+                .monitoring(Operation::Create {
+                    config: original.clone(),
+                    now: 1,
+                    jitter_ms: 0,
+                    key: Some("legacy-key".into())
+                })
+                .await,
+            Err(Error::Conflict)
+        ));
+        let mut replacement = original.clone();
+        replacement.name = "replacement".into();
+        let b = match client
+            .monitoring(Operation::Create {
+                config: replacement,
+                now: 1,
+                jitter_ms: 0,
+                key: None,
+            })
+            .await
+            .unwrap()
+        {
+            Value::Monitor(m) => m,
+            _ => panic!("monitor"),
+        };
+        assert!(b.id < 0);
+        for id in [10, 11] {
+            assert_ne!(b.id, id);
+        }
+        assert!(matches!(
+            client
+                .monitoring(Operation::Edit {
+                    id: 11,
+                    revision: 1,
+                    config: original,
+                    now: 2,
+                    jitter_ms: 0
+                })
+                .await,
+            Err(Error::NotFound)
+        ));
+        assert!(matches!(
+            client
+                .monitoring(Operation::Delete {
+                    id: 11,
+                    revision: 1,
+                    now: 2
+                })
+                .await,
+            Err(Error::NotFound)
+        ));
+        storage.shutdown().await.unwrap();
+        let snapshot = Connection::open(root.join("pre-migration.db")).unwrap();
+        assert_eq!(inspect(&snapshot).unwrap(), 2);
+        let storage = Storage::start(crate::ownership::StateOwner::acquire(&root).unwrap())
+            .await
+            .unwrap();
+        let client = storage.client();
+        let next: MonitorConfig = serde_json::from_str(
+            r#"{"name":"next","kind":"tcp","target":"fixture.invalid","port":443,"enabled":false}"#,
+        )
+        .unwrap();
+        let next = match client
+            .monitoring(Operation::Create {
+                config: next,
+                now: 3,
+                jitter_ms: 0,
+                key: None,
+            })
+            .await
+            .unwrap()
+        {
+            Value::Monitor(m) => m,
+            _ => panic!("monitor"),
+        };
+        assert!(next.id < b.id);
+        assert!(
+            client
+                .monitors()
+                .await
+                .unwrap()
+                .iter()
+                .any(|m| m.id == 10 && m.config.name == "legacy")
+        );
+        storage.shutdown().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn monitoring_upgrade_preserves_definitions_and_keeps_v1_recovery_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let owner = crate::ownership::StateOwner::acquire(&dir.path().join("state")).unwrap();
+        let root = owner.root().to_path_buf();
+        let path = root.join("monitor.db");
+        drop(private_file(&path).unwrap());
+        let mut db = Connection::open(&path).unwrap();
+        apply(&mut db, 1, MIGRATIONS[0].0, MIGRATIONS[0].1).unwrap();
+        db.execute("INSERT INTO monitors(id,name,kind,target,port,interval_seconds,deadline_seconds,failure_threshold,enabled,alerts,address_family,revision) VALUES(1,'legacy','tcp','fixture.invalid',443,60,5,3,0,0,'auto',1)",[]).unwrap();
+        db.execute("INSERT INTO probe_results(monitor_id,revision,scheduled_slot_ms,observed_at_ms,outcome) VALUES(1,1,0,0,'unknown')",[]).unwrap();
+        drop(db);
+        let storage = crate::storage::Storage::start(owner).await.unwrap();
+        let monitors = storage.client().monitors().await.unwrap();
+        assert_eq!(monitors.len(), 1);
+        assert_eq!(monitors[0].config.name, "legacy");
+        assert_eq!(monitors[0].state.status, crate::monitoring::Status::Paused);
+        storage.shutdown().await.unwrap();
+        let old = Connection::open(root.join("pre-migration.db")).unwrap();
+        assert_eq!(inspect(&old).unwrap(), 1);
+        let new = Connection::open(path).unwrap();
+        assert_eq!(inspect(&new).unwrap(), MIGRATIONS.len());
+        assert_eq!(
+            new.query_row("SELECT count(*) FROM probe_results", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+    }
+
     #[test]
     fn migration_failure_rolls_back_ddl_data_and_version() {
         let mut connection = Connection::open_in_memory().unwrap();
@@ -316,6 +514,37 @@ mod tests {
         assert_eq!(
             preflight(u64::MAX, 0, 0, u64::MAX, false),
             Err(Error::DiskPressure)
+        );
+    }
+
+    #[tokio::test]
+    async fn notifications_upgrade_preserves_v3_jobs_and_supported_recovery_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let owner = crate::ownership::StateOwner::acquire(&dir.path().join("state")).unwrap();
+        let root = owner.root().to_path_buf();
+        let path = root.join("monitor.db");
+        drop(private_file(&path).unwrap());
+        let mut db = Connection::open(&path).unwrap();
+        for (index, (name, sql)) in MIGRATIONS.iter().take(3).enumerate() {
+            apply(&mut db, index as i64 + 1, name, sql).unwrap();
+        }
+        db.execute("INSERT INTO notification_outbox(event_identity,kind,destination_revision,payload,state,attempts,next_attempt_at_ms,created_at_ms,expires_at_ms,message_id) VALUES('legacy-pending','test',1,'{}','pending',2,61000,1000,21601000,NULL),('legacy-delivered','test',1,'{}','delivered',1,2000,1000,21601000,42)",[]).unwrap();
+        drop(db);
+        let storage = crate::storage::Storage::start(owner).await.unwrap();
+        storage.shutdown().await.unwrap();
+        let old = Connection::open(root.join("pre-migration.db")).unwrap();
+        assert_eq!(inspect(&old).unwrap(), 3);
+        let new = Connection::open(path).unwrap();
+        assert_eq!(inspect(&new).unwrap(), 4);
+        let row:(String,i64,i64)=new.query_row("SELECT state,attempts,next_attempt_at_ms FROM notification_outbox WHERE event_identity='legacy-pending'",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+        assert_eq!(row, ("pending".into(), 2, 61000));
+        let row:(i64,i64)=new.query_row("SELECT message_id,terminal_at_ms FROM notification_outbox WHERE event_identity='legacy-delivered'",[],|r|Ok((r.get(0)?,r.get(1)?))).unwrap();
+        assert_eq!(row, (42, 1000));
+        assert_eq!(
+            new.query_row("SELECT cooldown_until_ms FROM telegram_state", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
         );
     }
 

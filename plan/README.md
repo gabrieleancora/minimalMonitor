@@ -1,7 +1,7 @@
 # minimalMonitor planning workspace
 
-Status: specification baseline, completed WP-00 feasibility, WP-01 foundation and WP-02 backend security; later packages have not started.
-Updated: 2026-10-11.
+Status: WP-00–WP-04 accepted for scoped handoff; WP-05 corrections supplied for WP05-R1/R2/R3; independent re-review pending; WP-06–WP-07 unstarted; full release qualification outstanding.
+Updated: 2026-10-18.
 
 This directory contains specifications and handoff reports. The isolated [WP-00 prototype](../feasibility/wp00/README.md) is outside `plan`; its [evidence report](agents/reports/WP-00.md) records completed implementation feasibility and remaining application release gates. The planning agent maintains this directory and does not implement the application, create deployment configurations, or start other agents. The owner explicitly calls implementation agents and selects their assignments.
 
@@ -10,9 +10,15 @@ The [application](../README.md), [WP-01 report](agents/reports/WP-01.md) and
 [WP-02 report](agents/reports/WP-02.md) cover the foundation, local accounts,
 authentication/CSRF, route protection, input limits and destination policy with
 Windows/Fedora evidence. This intermediate build is not a deployable monitoring
-release; WP-03 through WP-07 remain separately assignable.
+release. The owner assigned WP-03 on 2026-10-12; its
+[report](agents/reports/WP-03.md) covers monitoring, scheduling, persistence and
+policy validation. The [2026-10-14 re-review](agents/reports/WP-03-review.md#re-review-and-closure-2026-10-14) closes both restart-cleanup and monitor-identity findings with independent Windows/Fedora checks. WP-03 is accepted for its scoped handoff. The owner assigned WP-04 on 2026-10-14; its [report](agents/reports/WP-04.md) tracks Telegram implementation and scoped validation. The owner assigned WP-05 on 2026-10-18; its [GUI report](agents/reports/WP-05.md) records implementation and scoped evidence. WP-06–WP-07 remain unstarted.
+
+The [2026-10-18 WP-04 re-review](agents/reports/WP-04-review.md#re-review-and-closure-2026-10-18) closes the uncertain-claim recovery blocker after independent formatting/clippy and 91 Windows/93 Fedora passing tests. The correction adds bounded same-sender reconciliation and four deterministic regressions. WP-04 is accepted for its scoped handoff; WP-05 was subsequently assigned on 2026-10-18; see its [handoff](agents/reports/WP-05.md).
 
 ## Reading order
+
+The [WP-05 review](agents/reports/WP-05-review.md) identified focused-view staleness, a failing 90-day range and missing incident refresh. [Corrections and regression evidence](agents/reports/WP-05.md#wp05-r1r2r3-corrections-2026-10-18) are supplied; acceptance remains pending independent re-review.
 
 | Document | Purpose |
 | --- | --- |
@@ -54,6 +60,12 @@ Probe scope, Telegram channel destination, scale, single-admin access, retention
 
 | Date | Change |
 | --- | --- |
+| 2026-10-18 | Owner assigned WP-05. Embedded responsive GUI, themes, guarded pages, bounded heartbeat previews, forms, coverage/history, settings and desktop/mobile evidence implemented. Independent review and full release gates remain outstanding. |
+| 2026-10-18 | WP04-R1 correction and independent re-review complete. Four injected-reply regressions and 91 Windows/93 Fedora tests pass; formatting/clippy independently pass on both platforms. Worker release/lifecycle evidence retained. WP-04 accepted for scoped handoff; WP-05 ready for separate assignment. |
+| 2026-10-14 | Owner assigned WP-04 and authorized source transfer/Linux validation. Telegram backend, protected APIs, durable retries/cooldown and bounded receipts implemented; 87 Windows/89 Fedora tests, release and lifecycle checks pass. One namespace-only ping test is skipped in the ordinary Fedora suite. Scoped WP-04 handoff complete; release qualification remains outstanding. |
+| 2026-10-14 | WP-03 re-review closes both blockers after independent formatting/clippy and 60 Windows/62 Fedora tests. WP-04 is ready for separate assignment; full release qualification remains outstanding. |
+| 2026-10-13 | WP-03 review reran Windows/Fedora tests and identified restart-cleanup and monitor-ID reuse blockers. Acceptance and the WP-04 handoff remain pending; see the review report. |
+| 2026-10-12 | Owner-assigned WP-03 adds all-TCP policy, HTTP/HTTPS/TCP/native ping, protected monitoring APIs, transactional scheduling/coverage/incidents, retention and Windows/Fedora evidence. D-23 documents implementation details and the 50-row partial-hour allowance. Later packages and production remain unstarted. |
 | 2026-10-11 | D-22 records shared Telegram bot use, one-minute transient retries and durable provider cooldown; optional Bark fallback is planned as unassigned V2-01. No application changes. |
 | 2026-10-06 | Initial planning package; no application code, runnable deployment files, or agents created. |
 | 2026-10-06 | Owner confirmed ping and Telegram, 10–15 services, existing Nginx/WireGuard, and non-negotiable disk limit. |

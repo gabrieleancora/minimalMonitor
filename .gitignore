@@ -9,6 +9,14 @@ validation/wp01/evidence/
 validation/wp01/source.tar
 validation/wp02/evidence/
 validation/wp02/source.tar
+validation/wp03/evidence/
+validation/wp03/source.tar
+validation/wp03/transfer-manifest.json
+validation/wp03/__pycache__/
+validation/wp04/evidence/
+validation/wp04/source.tar
+validation/wp04/transfer-manifest.json
+validation/wp04/__pycache__/
 
 # Remove Cargo.lock from gitignore if creating an executable, leave it for libraries
 # More information here https://doc.rust-lang.org/cargo/guide/cargo-toml-vs-cargo-lock.html
@@ -68,3 +76,13 @@ fabric.properties
 # Keep the new D-15 transport source reviewable; other local prototype artifacts
 # retain the owner's existing ignore policy.
 feasibility/wp00/evidence/*
+
+validation/wp05/source.tar
+validation/wp05/__pycache__/
+
+# Generated validation/benchmark outputs stay local; commit sources and runners.
+validation/**/evidence/
+validation/**/results/
+validation/**/results-summary.json
+validation/**/transfer-manifest.json
+validation/**/source.tar

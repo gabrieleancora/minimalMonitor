@@ -1,9 +1,18 @@
 # Architecture and resource envelope
 
-Status: WP-01 foundation and WP-02 security implementation baseline; later
+Status: WP-01–WP-04 backend implementation baseline; later
 components remain planned. Resource numbers are targets to prove.
 
-WP-01 implements the [backend foundation](../../README.md), using the versions recorded in D-16 and its [report](../agents/reports/WP-01.md). Worker capacities below remain intact. The foundation server uses at most 16 active HTTP/1 connections (including parsing and writes), 16 KiB parser/header budget, a five-second connection deadline and one request per connection; overload closes excess sockets. Two async workers and at most two blocking helpers accompany one dedicated SQLite thread. Shared nonwaiting semaphores reserve four probe slots, one hash and one notification sender; WP-02 uses the hash slot while probe/sender workers remain future packages. Keep bounded connection admission when extending the server in later packages.
+WP-01 implements the [backend foundation](../../README.md), using the versions recorded in D-16 and its [report](../agents/reports/WP-01.md). The server uses at most 16 active HTTP/1 connections (including parsing and writes), 16 KiB parser/header budget, a five-second connection deadline and one request per connection; overload closes excess sockets. WP-03 retains two async workers and one dedicated SQLite thread, increasing the blocking-helper ceiling from two to six as described below. Shared nonwaiting semaphores reserve four probe slots, one hash and one notification sender; WP-02 uses the hash slot and WP-03 uses the probe slots, while notification sending remains WP-04. Keep bounded connection admission when extending the server in later packages.
+
+WP-04 now uses the independent sender slot and raises the blocking-helper ceiling
+to seven: four probe helpers, one sender DNS helper, one hash and one storage join.
+The same native resolver retains its notification permit after cancellation;
+stalled sender DNS cannot multiply helpers or consume probe permits. One sender
+polls at 200 ms, keeps at most one acknowledgement in memory and persists request
+identity before submission. It never retries a remotely completed request merely
+because acknowledgement storage is temporarily blocked. No new production
+dependency, socket pool, proxy, inbound bot handler or provider framework is added.
 
 ## System boundaries
 
@@ -26,7 +35,7 @@ The WP-01 lock is `owner.lock` in the private state directory, retained without 
 | --- | --- | --- |
 | HTTP server | Axum, Tokio, selected Tower middleware | Async I/O and composable bounds; enable only required features |
 | Probe HTTP/HTTPS | Hyper HTTP/1 with rustls | WP-00 validates 32 KiB wire header/parser-buffer limits and 100-header count; verified TLS, one-shot connections, scoped driver and total deadline |
-| Telegram | reqwest with rustls | Separate fixed-origin client/policy, verified TLS and bounded response handling to implement/test in WP-04 |
+| Telegram | Existing Hyper HTTP/1 with rustls (D-24) | Fixed official origin, public roots, numeric connection after whole-set policy, scoped driver, bounded headers/body and deadline; no pool, redirects, proxy environment or extra runtime dependency |
 | Database | rusqlite with bundled SQLite | Consistent database version across Windows/Linux; dedicated worker avoids blocking async runtime |
 | HTML | Escaping template engine such as Askama | Server-rendered shell, no large SPA framework |
 | Browser | Local CSS, small JavaScript modules, simple SVG charts | No CDN, external fonts, telemetry or browser dependencies at runtime |
@@ -38,6 +47,16 @@ These choices are proposals, not selected version numbers. Pin compatible versio
 WP-00's isolated Windows and Fedora prototypes support basic stack feasibility, not production qualification. The owner-authorized Hyper follow-up resolves D-15 with measured parser-limit tests on both platforms, verified TLS and short capped Linux release execution. Non-root v4/v6 echo was additionally proven with a one-group permission and zero capabilities in a disposable namespace. The feasibility gate is complete; later application security/retention/soak and production distribution tests remain required. See [the evidence report](../agents/reports/WP-00.md) and [available Linux development environment](../operations/linux-development.md).
 
 ## Runtime separation
+
+WP-03 uses four admitted probe futures and retains their permits inside native
+DNS/ICMP blocking calls even after cancellation. Native DNS cannot be interrupted;
+four stuck calls exhaust probe admission and produce unknown coverage rather than
+more native tasks. The runtime now allows six blocking helpers: four probe calls,
+one hash and one storage join. HTTP/TLS drivers are scoped to their probe futures.
+The scheduler polls at 200 ms, detects wall/monotonic drift over two seconds,
+reanchors with a persisted discontinuity, and never launches checks through a
+browser request. Readiness includes recent scheduler progress. See
+[WP-03 evidence](../agents/reports/WP-03.md).
 
 WP-02 adds one admitted blocking Argon2 task, retaining its permit through
 cancellation. Login and password change share the global hash-start limiter;

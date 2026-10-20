@@ -65,6 +65,15 @@ change/restart re-anchor. This keeps downtime in the coverage denominator withou
 inventing further confirmations. WP-03 must preserve these boundaries in its
 epoch/coverage model.
 
+During restart and clock-jump reanchoring, run separately admitted retention
+transactions before each catch-up attempt. Each deletes at most 500 eligible
+history rows, including tombstone cleanup; normal housekeeping remains periodic.
+Incomplete catch-up and insert-capacity errors cannot bypass housekeeping.
+Recovery remains degraded until it commits and scheduler progress resumes.
+Non-reclaimable row capacity and genuine disk/WAL pressure remain visible faults;
+do not relax admission, delete protected incidents, or fabricate coverage to
+force a reanchor.
+
 After an edit affecting probe behavior, increment its configuration revision, cancel old work, discard late results from the old revision, reset failure streak, and show unknown until the new configuration is checked. Close an existing incident as `configuration_changed`, not recovered. Pause cancels active work and ends the incident as `paused`; resume starts a new schedule epoch and unknown state.
 
 ## State and incidents

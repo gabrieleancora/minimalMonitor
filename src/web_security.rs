@@ -32,6 +32,15 @@ struct Identity {
     csrf: [u8; 32],
 }
 pub fn router(auth: Auth, origin: &url::Url, mode: Mode, trusted_proxy: Option<IpAddr>) -> Router {
+    extended_router(auth, origin, mode, trusted_proxy, Router::new())
+}
+pub(crate) fn extended_router(
+    auth: Auth,
+    origin: &url::Url,
+    mode: Mode,
+    trusted_proxy: Option<IpAddr>,
+    monitoring: Router,
+) -> Router {
     let host = match origin.port() {
         Some(port) => format!("{}:{port}", origin.host_str().unwrap_or_default()),
         None => origin.host_str().unwrap_or_default().to_owned(),
@@ -70,6 +79,8 @@ pub fn router(auth: Auth, origin: &url::Url, mode: Mode, trusted_proxy: Option<I
         })
         .with_state(app.clone())
         .merge(crate::web::health_router(auth.storage))
+        .merge(monitoring)
+        .merge(crate::web_gui::router())
         .layer(middleware::from_fn_with_state(app, guard))
 }
 fn names(secure: bool) -> (&'static str, &'static str) {
@@ -120,12 +131,13 @@ fn set_cookie(response: &mut Response, name: &str, token: &str, secure: bool, ag
         response.headers_mut().append(header::SET_COOKIE, header);
     }
 }
-fn error(err: Error) -> Response {
+pub(crate) fn error(err: Error) -> Response {
     let status = match err {
         Error::Unauthorized => StatusCode::UNAUTHORIZED,
         Error::Forbidden => StatusCode::FORBIDDEN,
         Error::InvalidInput => StatusCode::UNPROCESSABLE_ENTITY,
         Error::Conflict => StatusCode::CONFLICT,
+        Error::NotFound => StatusCode::NOT_FOUND,
         Error::RateLimited => StatusCode::TOO_MANY_REQUESTS,
         _ => StatusCode::SERVICE_UNAVAILABLE,
     };
@@ -150,7 +162,15 @@ fn error(err: Error) -> Response {
 async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) -> Response {
     let path = request.uri().path().to_owned();
     let health = matches!(path.as_str(), "/health/live" | "/health/ready");
-    let public = matches!(path.as_str(), "/login" | "/auth/login" | "/assets/login.js");
+    let public = matches!(
+        path.as_str(),
+        "/login"
+            | "/auth/login"
+            | "/assets/login.js"
+            | "/assets/theme.js"
+            | "/assets/app.css"
+            | "/assets/app.js"
+    );
     let mutation = !matches!(
         *request.method(),
         Method::GET | Method::HEAD | Method::OPTIONS
@@ -171,7 +191,10 @@ async fn guard(State(app): State<Arc<App>>, mut request: Request, next: Next) ->
             let ip = client_ip(&request, peer.ip(), app.trusted_proxy)?;
             request.extensions_mut().insert(ClientIp(ip));
         }
-        if request.uri().query().is_some() {
+        if request.uri().query().is_some()
+            && !crate::web_monitoring::allows_query(&path)
+            && path != "/api/v1/notifications"
+        {
             return Err(Error::InvalidInput);
         }
         if mutation && !health && value(&request, "origin") != Some(app.origin.as_str()) {
@@ -223,7 +246,8 @@ async fn login_page(State(app): State<Arc<App>>) -> Response {
         Ok(token) => token,
         Err(err) => return error(err),
     };
-    let mut response=Html(format!("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>minimalMonitor login</title><h1>Sign in</h1><form id=\"login\"><input name=\"username\" autocomplete=\"username\" aria-label=\"Username\" maxlength=\"64\" required><input name=\"password\" type=\"password\" autocomplete=\"current-password\" aria-label=\"Password\" maxlength=\"128\" required><input name=\"csrf\" type=\"hidden\" value=\"{token}\"><button>Sign in</button></form><p id=\"result\" role=\"status\"></p><script src=\"/assets/login.js\" defer></script></html>")).into_response();
+    let mut response =
+        Html(include_str!("../assets/login.html").replace("__CSRF__", &token)).into_response();
     set_cookie(&mut response, names(app.secure).1, &token, app.secure, 300);
     response
 }
@@ -377,11 +401,22 @@ mod tests {
         let auth = Auth::new(storage.client(), WorkBounds::default())
             .await
             .unwrap();
-        let app = router(
+        let app = extended_router(
             auth.clone(),
             &url::Url::parse("https://monitor.invalid").unwrap(),
             Mode::Production,
             None,
+            crate::web_monitoring::router(
+                storage.client(),
+                crate::scheduler::SchedulerHealth::default(),
+            )
+            .merge(crate::web_notifications::router(
+                storage.client(),
+                crate::notifications::SenderHealth {
+                    token_present: true,
+                    ..Default::default()
+                },
+            )),
         )
         .layer(middleware::from_fn(crate::web::boundary));
         (dir, storage, auth, app)
@@ -451,7 +486,7 @@ mod tests {
             );
             assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
         }
-        for path in ["/", "/settings", "/monitors/1"] {
+        for path in ["/", "/settings", "/incidents", "/monitors/1"] {
             let response = app
                 .clone()
                 .oneshot(request(path, "GET", None, None, ""))
@@ -561,6 +596,172 @@ mod tests {
             } else {
                 assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
                 assert_eq!(response.headers()[header::RETRY_AFTER], "10");
+            }
+        }
+        storage.shutdown().await.unwrap();
+    }
+    #[tokio::test]
+    async fn telegram_routes_enforce_auth_csrf_revisions_validation_and_bounded_redacted_reads() {
+        let (_dir, storage, auth, app) = fixture().await;
+        auth.local_account(
+            "fixture".into(),
+            Zeroizing::new("controlled test passphrase".into()),
+            false,
+        )
+        .await
+        .unwrap();
+        let login = auth
+            .login(
+                "fixture".into(),
+                Zeroizing::new("controlled test passphrase".into()),
+                "127.0.0.1".parse().unwrap(),
+            )
+            .await
+            .unwrap();
+        let cookie = format!("__Host-mm-session={}", login.token);
+        for (path, method, input) in [
+            (
+                "/api/v1/settings/telegram",
+                "PATCH",
+                r#"{"revision":1,"enabled":true,"chat_id":"-9223372036854775808"}"#,
+            ),
+            ("/api/v1/settings/telegram/test", "POST", ""),
+        ] {
+            assert_eq!(
+                app.clone()
+                    .oneshot(request(path, method, Some(&cookie), None, input))
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::FORBIDDEN
+            );
+        }
+        let response = app
+            .clone()
+            .oneshot(request(
+                "/api/v1/settings/telegram",
+                "PATCH",
+                Some(&cookie),
+                Some(&login.csrf),
+                r#"{"revision":1,"enabled":true,"chat_id":"-9223372036854775808"}"#,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let config: serde_json::Value = serde_json::from_str(&body(response).await).unwrap();
+        assert_eq!(
+            config["settings"]["chat_id"].as_str(),
+            Some("-9223372036854775808")
+        );
+        for (input, status) in [
+            (
+                r#"{"revision":1,"enabled":true,"chat_id":-100}"#,
+                StatusCode::CONFLICT,
+            ),
+            (
+                r#"{"revision":2,"enabled":true,"chat_id":0}"#,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                r#"{"revision":2,"enabled":true,"chat_id":"-100oops"}"#,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                r#"{"revision":2,"enabled":true,"chat_id":-100,"token":"sensitive-placeholder"}"#,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                r#"{"revision":2,"revision":2,"enabled":true,"chat_id":-100}"#,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                r#"{"revision":2,"enabled":true,"chat_id":-100,"api_base":"https://evil.invalid"}"#,
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(
+                    "/api/v1/settings/telegram",
+                    "PATCH",
+                    Some(&cookie),
+                    Some(&login.csrf),
+                    input,
+                ))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), status);
+            assert!(!body(response).await.contains("sensitive-placeholder"));
+        }
+        let response = app
+            .clone()
+            .oneshot(request(
+                "/api/v1/settings/telegram/test",
+                "POST",
+                Some(&cookie),
+                Some(&login.csrf),
+                "",
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        let response = app
+            .clone()
+            .oneshot(request(
+                "/api/v1/settings/telegram/test",
+                "POST",
+                Some(&cookie),
+                Some(&login.csrf),
+                "",
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers()[header::RETRY_AFTER], "60");
+        for query in [
+            "limit=101",
+            "limit=0",
+            "limit=1&limit=1",
+            "token=sensitive-placeholder",
+            "before=-1",
+            "limit=%31",
+        ] {
+            assert_eq!(
+                app.clone()
+                    .oneshot(request(
+                        &format!("/api/v1/notifications?{query}"),
+                        "GET",
+                        Some(&cookie),
+                        None,
+                        ""
+                    ))
+                    .await
+                    .unwrap()
+                    .status(),
+                StatusCode::UNPROCESSABLE_ENTITY
+            );
+        }
+        for path in [
+            "/api/v1/settings/telegram",
+            "/api/v1/notifications?limit=100",
+            "/api/v1/summary",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(path, "GET", Some(&cookie), None, ""))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            let content = body(response).await;
+            for forbidden in [
+                "bot_fingerprint",
+                "password_hash",
+                "SYNTHETIC",
+                "sensitive-placeholder",
+                "api_base",
+            ] {
+                assert!(!content.contains(forbidden));
             }
         }
         storage.shutdown().await.unwrap();
@@ -691,6 +892,313 @@ mod tests {
         let c = response.headers()[header::SET_COOKIE].to_str().unwrap();
         assert!(c.starts_with("mm-dev-preauth="));
         assert!(!c.contains("Secure"));
+        storage.shutdown().await.unwrap();
+    }
+    #[tokio::test]
+    async fn monitoring_routes_commit_require_csrf_and_return_bounded_safe_errors() {
+        let (_dir, storage, auth, app) = fixture().await;
+        let password = || Zeroizing::new("controlled monitor passphrase".into());
+        auth.local_account("fixture".into(), password(), false)
+            .await
+            .unwrap();
+        let login = auth
+            .login("fixture".into(), password(), "127.0.0.1".parse().unwrap())
+            .await
+            .unwrap();
+        let cookie = format!("__Host-mm-session={}", login.token);
+        let config =
+            r#"{"name":"fixture","kind":"http","target":"https://fixture.invalid/","port":null}"#;
+        let response = app
+            .clone()
+            .oneshot(request(
+                "/api/v1/monitors",
+                "POST",
+                Some(&cookie),
+                None,
+                config,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let mut create = request(
+            "/api/v1/monitors",
+            "POST",
+            Some(&cookie),
+            Some(&login.csrf),
+            config,
+        );
+        create
+            .headers_mut()
+            .insert("idempotency-key", HeaderValue::from_static("fixture-key"));
+        let response = app.clone().oneshot(create).await.unwrap();
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let value: serde_json::Value = serde_json::from_str(&body(response).await).unwrap();
+        let id = value["id"].as_i64().unwrap();
+        assert_eq!(storage.client().monitors().await.unwrap().len(), 1);
+        for range in [
+            3_600_000,
+            86_400_000,
+            604_800_000,
+            90 * crate::monitoring::DAY_MS,
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(
+                    &format!("/api/v1/monitors/{id}/history?range_ms={range}"),
+                    "GET",
+                    Some(&cookie),
+                    None,
+                    "",
+                ))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let history: serde_json::Value = serde_json::from_str(&body(response).await).unwrap();
+            assert_eq!(
+                history["end_ms"].as_i64().unwrap() - history["start_ms"].as_i64().unwrap(),
+                range
+            );
+        }
+        for query in [
+            "range_ms=0",
+            "range_ms=-1",
+            "range_ms=7776000001",
+            "range_ms=3600000&end_ms=1",
+            "range_ms=3600000&start_ms=1",
+            "range_ms=1&range_ms=2",
+            "range_ms=9223372036854775807",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(
+                    &format!("/api/v1/monitors/{id}/history?{query}"),
+                    "GET",
+                    Some(&cookie),
+                    None,
+                    "",
+                ))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        let now = now_ms().unwrap();
+        let response = app
+            .clone()
+            .oneshot(request(
+                &format!(
+                    "/api/v1/monitors/{id}/history?start_ms={}&end_ms={}",
+                    now - 7776006000,
+                    now - 6000
+                ),
+                "GET",
+                Some(&cookie),
+                None,
+                "",
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        for (path, method, input) in [
+            (
+                "/api/v1/monitors".to_owned(),
+                "POST",
+                r#"{"name":"fixture","kind":"tcp","target":"fixture.invalid","port":443,"interval_seconds":0}"#,
+            ),
+            (
+                format!("/api/v1/monitors/{id}"),
+                "PATCH",
+                r#"{"revision":0,"config":{"name":"fixture","kind":"tcp","target":"fixture.invalid","port":443}}"#,
+            ),
+            (
+                format!("/api/v1/monitors/{id}"),
+                "DELETE",
+                r#"{"revision":1,"confirm_history_deletion":false}"#,
+            ),
+            (
+                format!("/api/v1/monitors/{id}/history?token=sensitive-sentinel"),
+                "GET",
+                "",
+            ),
+            (
+                "/api/v1/monitors/sensitive-sentinel/history".to_owned(),
+                "GET",
+                "",
+            ),
+            ("/api/v1/incidents?limit=101".to_owned(), "GET", ""),
+            ("/api/v1/incidents?limit=1&limit=2".to_owned(), "GET", ""),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(
+                    &path,
+                    method,
+                    Some(&cookie),
+                    Some(&login.csrf),
+                    input,
+                ))
+                .await
+                .unwrap();
+            assert!(response.status().is_client_error());
+            let text = body(response).await;
+            assert!(!text.contains("sensitive-sentinel"));
+            assert!(text.len() < 256);
+        }
+        let response = app
+            .clone()
+            .oneshot(request("/api/v1/summary", "GET", Some(&cookie), None, ""))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let response = app
+            .clone()
+            .oneshot(request(
+                &format!("/api/v1/monitors/{id}/pause"),
+                "POST",
+                Some(&cookie),
+                Some(&login.csrf),
+                r#"{"revision":1}"#,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            storage.client().monitors().await.unwrap()[0].state.status,
+            crate::monitoring::Status::Paused
+        );
+        let response = app
+            .clone()
+            .oneshot(request(
+                &format!("/api/v1/monitors/{id}"),
+                "DELETE",
+                Some(&cookie),
+                Some(&login.csrf),
+                r#"{"revision":2,"confirm_history_deletion":true}"#,
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::ACCEPTED);
+        assert!(storage.client().monitors().await.unwrap().is_empty());
+        storage.shutdown().await.unwrap();
+    }
+    #[tokio::test]
+    async fn gui_assets_private_shell_and_maximum_summary_are_bounded() {
+        let (_dir, storage, auth, app) = fixture().await;
+        for (path, content_type) in [
+            ("/assets/app.js", "text/javascript; charset=utf-8"),
+            ("/assets/theme.js", "text/javascript; charset=utf-8"),
+            ("/assets/app.css", "text/css; charset=utf-8"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(path, "GET", None, None, ""))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(response.headers()[header::CONTENT_TYPE], content_type);
+            assert!(
+                response.headers()[header::CONTENT_SECURITY_POLICY]
+                    .to_str()
+                    .unwrap()
+                    .contains("script-src 'self'")
+            );
+        }
+        let secret = Zeroizing::new(hex(&crate::auth::random().unwrap()));
+        auth.local_account("review".into(), secret.clone(), false)
+            .await
+            .unwrap();
+        let login = auth
+            .login("review".into(), secret, "127.0.0.1".parse().unwrap())
+            .await
+            .unwrap();
+        let cookie = format!("__Host-mm-session={}", login.token);
+        for path in [
+            "/",
+            "/settings",
+            "/incidents",
+            "/monitors/-9223372036854775808",
+        ] {
+            let response = app
+                .clone()
+                .oneshot(request(path, "GET", Some(&cookie), None, ""))
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let html = body(response).await;
+            assert!(html.contains("/assets/theme.js"));
+            assert!(!html.contains("__Host-mm-session"));
+        }
+        let now = now_ms().unwrap();
+        for _index in 0..50 {
+            let config = crate::monitoring::MonitorConfig {
+                name: "🛰".repeat(100),
+                kind: crate::monitoring::Kind::Http,
+                target: format!("https://service.example/{}", "a".repeat(2024)),
+                port: None,
+                interval_seconds: 3600,
+                deadline_seconds: 1,
+                failure_threshold: 1,
+                enabled: true,
+                alerts: true,
+                address_family: crate::monitoring::Family::Auto,
+                accepted_statuses: vec![[200, 299]; 32],
+            };
+            let monitor = match storage
+                .client()
+                .monitoring(crate::storage::monitoring::Operation::Create {
+                    config,
+                    now: now - 86_400_000,
+                    jitter_ms: 0,
+                    key: None,
+                })
+                .await
+                .unwrap()
+            {
+                crate::storage::monitoring::Value::Monitor(m) => m,
+                _ => panic!("create"),
+            };
+            {
+                for step in 0..20 {
+                    storage
+                        .client()
+                        .monitoring(crate::storage::monitoring::Operation::Complete {
+                            id: monitor.id,
+                            revision: monitor.revision,
+                            epoch: monitor.epoch,
+                            due: now - 86_400_000 + i64::from(step) * 3_600_000,
+                            completed: now - 86_400_000 + i64::from(step) * 3_600_000 + 5,
+                            result: crate::monitoring::ProbeResult::success(),
+                        })
+                        .await
+                        .unwrap();
+                }
+            }
+        }
+        let response = app
+            .clone()
+            .oneshot(request("/api/v1/summary", "GET", Some(&cookie), None, ""))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let bytes = to_bytes(response.into_body(), crate::bounds::RESPONSE_BYTES)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["monitors"].as_array().unwrap().len(), 50);
+        assert_eq!(value["recent"].as_object().unwrap().len(), 50);
+        let samples = value["recent"]
+            .as_object()
+            .unwrap()
+            .values()
+            .find(|v| v.as_array().unwrap().len() == 12)
+            .unwrap()
+            .as_array()
+            .unwrap();
+        assert_eq!(samples.len(), 12);
+        assert_eq!(samples[0]["scheduled_ms"], now - 86_400_000 + 8 * 3_600_000);
+        assert_eq!(
+            samples[11]["scheduled_ms"],
+            now - 86_400_000 + 19 * 3_600_000
+        );
         storage.shutdown().await.unwrap();
     }
 }

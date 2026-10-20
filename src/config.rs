@@ -28,6 +28,9 @@ struct RawConfig {
     trusted_proxy: Option<IpAddr>,
     #[serde(default)]
     destination_rules: Vec<crate::destination::Rule>,
+    #[serde(default)]
+    extra_trust_roots: Vec<PathBuf>,
+    telegram_token_file: Option<PathBuf>,
 }
 
 /// Deliberately lacks Debug: configuration may contain sensitive hostnames.
@@ -38,6 +41,8 @@ pub struct Config {
     pub public_origin: Url,
     pub destination_policy: crate::destination::Policy,
     pub trusted_proxy: Option<IpAddr>,
+    pub extra_trust_roots: Vec<tokio_rustls::rustls::pki_types::CertificateDer<'static>>,
+    pub telegram_token: Option<std::sync::Arc<crate::notifications::Token>>,
 }
 
 impl Config {
@@ -91,6 +96,43 @@ impl Config {
                 .map_err(|_| Error::Configuration)?
                 .join(path)
         };
+        if raw.extra_trust_roots.len() > 16 {
+            return Err(Error::Configuration);
+        }
+        let mut extra_trust_roots = Vec::with_capacity(raw.extra_trust_roots.len());
+        let mut total = 0usize;
+        for path in raw.extra_trust_roots {
+            let path = if path.is_absolute() {
+                path
+            } else {
+                base.join(path)
+            };
+            let mut bytes = Vec::new();
+            File::open(path)
+                .map_err(|_| Error::Configuration)?
+                .take(16385)
+                .read_to_end(&mut bytes)
+                .map_err(|_| Error::Configuration)?;
+            total += bytes.len();
+            if bytes.is_empty() || bytes.len() > 16384 || total > 128 * 1024 {
+                return Err(Error::Configuration);
+            }
+            let root = tokio_rustls::rustls::pki_types::CertificateDer::from(bytes);
+            let mut test = tokio_rustls::rustls::RootCertStore::empty();
+            test.add(root.clone()).map_err(|_| Error::Configuration)?;
+            extra_trust_roots.push(root);
+        }
+        let telegram_token = raw
+            .telegram_token_file
+            .map(|path| {
+                let path = if path.is_absolute() {
+                    path
+                } else {
+                    base.join(path)
+                };
+                crate::notifications::Token::load(&path).map(std::sync::Arc::new)
+            })
+            .transpose()?;
         Ok(Self {
             mode: raw.mode,
             listen: raw.listen,
@@ -98,6 +140,8 @@ impl Config {
             public_origin: origin,
             destination_policy: crate::destination::Policy::new(raw.destination_rules)?,
             trusted_proxy: raw.trusted_proxy,
+            extra_trust_roots,
+            telegram_token,
         })
     }
 }
@@ -114,6 +158,8 @@ mod tests {
             public_origin: origin.into(),
             destination_rules: Vec::new(),
             trusted_proxy: None,
+            extra_trust_roots: Vec::new(),
+            telegram_token_file: None,
         }
     }
 
